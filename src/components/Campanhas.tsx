@@ -17,7 +17,8 @@ const Campanhas: React.FC = () => {
       comSaldo: 248,
       semSaldo: 62,
       erro: 10,
-      data: '10/01/2023'
+      data: '10/01/2023',
+      consultationLogs: [] // Add consultationLogs array
     },
     {
       id: 2,
@@ -27,7 +28,8 @@ const Campanhas: React.FC = () => {
       comSaldo: 312,
       semSaldo: 123,
       erro: 15,
-      data: '15/12/2022'
+      data: '15/12/2022',
+      consultationLogs: [] // Add consultationLogs array
     },
     {
       id: 3,
@@ -37,7 +39,8 @@ const Campanhas: React.FC = () => {
       comSaldo: 183,
       semSaldo: 82,
       erro: 10,
-      data: '22/11/2022'
+      data: '22/11/2022',
+      consultationLogs: [] // Add consultationLogs array
     },
     {
       id: 4,
@@ -45,11 +48,13 @@ const Campanhas: React.FC = () => {
       status: 'em_andamento',
       total: 150,
       processados: 68,
-      data: '05/02/2023'
+      data: '05/02/2023',
+      consultationLogs: [] // Add consultationLogs array
     }
   ]);
   const [clients, setClients] = useState<any[]>([]); // Simulated "database" for clients
   const [campaignTimeouts, setCampaignTimeouts] = useState<{ [key: number]: number }>({}); // Store timeouts for pausing
+  const [consultationLogs, setConsultationLogs] = useState<any[]>([]);
 
   // Dados de exemplo para a visualização detalhada da campanha
   const detalheCampanha = {
@@ -118,7 +123,8 @@ const Campanhas: React.FC = () => {
       total: clients.length,
       processados: 0,
       data: new Date().toLocaleDateString('pt-BR'),
-      clientes: [...clients] // Save clients to the campaign
+      clientes: [...clients], // Save clients to the campaign
+      consultationLogs: []
     };
     
     setCampanhas([...campanhas, newCampanha]);
@@ -170,7 +176,27 @@ const Campanhas: React.FC = () => {
       .then(response => response.json())
       .then(data => {
         console.log('API Response:', data);
-        // Handle the API response here
+        // Store the consultation log
+        const logEntry = {
+          cpf: cliente.CPF,
+          nome: cliente.CLIENTE_NOME,
+          telefone: cliente.CLIENTE_CELULAR,
+          status: data.status || 'success', // Adjust based on actual API response
+          data: new Date().toLocaleDateString('pt-BR'),
+          hora: new Date().toLocaleTimeString('pt-BR')
+        };
+
+        setCampanhas(prevCampanhas => {
+          return prevCampanhas.map(campanha => {
+            if (campanha.id === campanhaId) {
+              return {
+                ...campanha,
+                consultationLogs: [...campanha.consultationLogs, logEntry]
+              };
+            }
+            return campanha;
+          });
+        });
       })
       .catch(error => {
         console.error('API Error:', error);
@@ -300,6 +326,7 @@ const Campanhas: React.FC = () => {
                     onClick={() => {
                       setSelectedCampanha(campanha);
                       setActiveView('detalhes');
+                      setConsultationLogs(campanha.consultationLogs); // Set consultation logs
                     }}
                     className="text-green-600 hover:text-green-900 mr-3"
                   >
@@ -551,149 +578,129 @@ const Campanhas: React.FC = () => {
     </>
   );
   
-  // Renderiza detalhes de uma campanha
-  const renderDetalhesCampanha = () => (
-    <>
-      <div className="mb-6 flex items-center">
-        <button
-          onClick={() => setActiveView('lista')}
-          className="mr-4 text-gray-600 hover:text-gray-900"
-        >
-          ← Voltar
-        </button>
-        <h2 className="text-xl font-medium text-gray-800">{detalheCampanha.nome}</h2>
-        <span className="ml-3 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-          Concluído
-        </span>
-      </div>
-      
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm text-gray-500">Total de CPFs</div>
-          <div className="text-2xl font-bold text-gray-800">{detalheCampanha.totalCPFs}</div>
+  const renderDetalhesCampanha = () => {
+    if (!selectedCampanha) {
+      return <div>Campanha não selecionada.</div>;
+    }
+
+    return (
+      <>
+        <div className="mb-6 flex items-center">
+          <button
+            onClick={() => setActiveView('lista')}
+            className="mr-4 text-gray-600 hover:text-gray-900"
+          >
+            ← Voltar
+          </button>
+          <h2 className="text-xl font-medium text-gray-800">{selectedCampanha.nome}</h2>
+          <span className="ml-3 px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
+            {selectedCampanha.status}
+          </span>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm text-gray-500">Com Saldo</div>
-          <div className="text-2xl font-bold text-green-600">
-            {detalheCampanha.resultados.filter(r => r.status === 'com_saldo').length} 
-            <span className="text-sm text-gray-500 font-normal">
-              ({Math.round((detalheCampanha.resultados.filter(r => r.status === 'com_saldo').length / detalheCampanha.totalCPFs) * 100)}%)
-            </span>
+
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-6">
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="text-sm text-gray-500">Total de CPFs</div>
+            <div className="text-2xl font-bold text-gray-800">{selectedCampanha.total}</div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="text-sm text-gray-500">Com Saldo</div>
+            <div className="text-2xl font-bold text-green-600">
+              {detalheCampanha.resultados.filter(r => r.status === 'com_saldo').length}
+              <span className="text-sm text-gray-500 font-normal">
+                ({Math.round((detalheCampanha.resultados.filter(r => r.status === 'com_saldo').length / selectedCampanha.total) * 100)}%)
+              </span>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="text-sm text-gray-500">Sem Saldo</div>
+            <div className="text-2xl font-bold text-gray-600">
+              {detalheCampanha.resultados.filter(r => r.status === 'sem_saldo').length}
+              <span className="text-sm text-gray-500 font-normal">
+                ({Math.round((detalheCampanha.resultados.filter(r => r.status === 'sem_saldo').length / selectedCampanha.total) * 100)}%)
+              </span>
+            </div>
+          </div>
+          <div className="bg-white rounded-lg shadow p-4">
+            <div className="text-sm text-gray-500">Erro</div>
+            <div className="text-2xl font-bold text-red-600">
+              {detalheCampanha.resultados.filter(r => r.status === 'erro').length}
+              <span className="text-sm text-gray-500 font-normal">
+                ({Math.round((detalheCampanha.resultados.filter(r => r.status === 'erro').length / selectedCampanha.total) * 100)}%)
+              </span>
+            </div>
           </div>
         </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm text-gray-500">Sem Saldo</div>
-          <div className="text-2xl font-bold text-gray-600">
-            {detalheCampanha.resultados.filter(r => r.status === 'sem_saldo').length}
-            <span className="text-sm text-gray-500 font-normal">
-              ({Math.round((detalheCampanha.resultados.filter(r => r.status === 'sem_saldo').length / detalheCampanha.totalCPFs) * 100)}%)
-            </span>
+
+        <div className="bg-white rounded-lg shadow mb-6">
+          <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
+            <h3 className="text-lg font-medium text-gray-800">Resultados da Campanha</h3>
+            <div className="flex items-center space-x-2">
+              <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md" title="Filtrar">
+                <Filter className="h-5 w-5" />
+              </button>
+              <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md" title="Exportar">
+                <Download className="h-5 w-5" />
+              </button>
+            </div>
           </div>
-        </div>
-        <div className="bg-white rounded-lg shadow p-4">
-          <div className="text-sm text-gray-500">Erro</div>
-          <div className="text-2xl font-bold text-red-600">
-            {detalheCampanha.resultados.filter(r => r.status === 'erro').length}
-            <span className="text-sm text-gray-500 font-normal">
-              ({Math.round((detalheCampanha.resultados.filter(r => r.status === 'erro').length / detalheCampanha.totalCPFs) * 100)}%)
-            </span>
-          </div>
-        </div>
-      </div>
-      
-      <div className="bg-white rounded-lg shadow mb-6">
-        <div className="px-6 py-4 border-b border-gray-200 flex justify-between items-center">
-          <h3 className="text-lg font-medium text-gray-800">Resultados da Campanha</h3>
-          <div className="flex items-center space-x-2">
-            <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md" title="Filtrar">
-              <Filter className="h-5 w-5" />
-            </button>
-            <button className="p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-md" title="Exportar">
-              <Download className="h-5 w-5" />
-            </button>
-          </div>
-        </div>
-        
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Nome
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  CPF
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Telefone
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Saldo
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Última Tentativa
-                </th>
-                <th className="px-6 py-3 text-right text-xs font-medium">
-                  Ações
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {detalheCampanha.resultados.map((resultado, index) => (
-                <tr key={index}>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{resultado.nome}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {resultado.cpf}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {resultado.telefone}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    {resultado.status === 'com_saldo' ? (
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                        Com Saldo
-                      </span>
-                    ) : resultado.status === 'sem_saldo' ? (
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                        Sem Saldo
-                      </span>
-                    ) : (
-                      <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                        Erro
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {resultado.saldo !== null ? `R$ ${resultado.saldo.toFixed(2)}` : '-'}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                    {resultado.ultimaTentativa}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    {resultado.status === 'erro' ? (
-                      <button className="text-blue-600 hover:text-blue-900 flex items-center justify-end">
-                        <RefreshCw className="h-4 w-4 mr-1" />
-                        Reprocessar
-                      </button>
-                    ) : (
-                      <button className="text-gray-600 hover:text-gray-900">
-                        Ver Detalhes
-                      </button>
-                    )}
-                  </td>
+
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Nome
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    CPF
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Telefone
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Data
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Hora
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {consultationLogs.map((log, index) => (
+                  <tr key={index}>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{log.nome}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {log.cpf}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {log.telefone}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${log.status === 'success' ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
+                        {log.status === 'success' ? 'Sucesso' : 'Falha'}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {log.data}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                      {log.hora}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </>
-  );
+      </>
+    );
+  };
   
   // Renderiza o conteúdo principal com base na view ativa
   const renderContent = () => {
