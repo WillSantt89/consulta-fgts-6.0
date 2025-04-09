@@ -40,7 +40,7 @@ const Campanhas: React.FC = () => {
       data: '22/11/2022'
     },
     {
-      id: 4, 
+      id: 4,
       nome: 'Campanha Fevereiro/2023',
       status: 'em_andamento',
       total: 150,
@@ -515,8 +515,32 @@ const Campanhas: React.FC = () => {
             <button
               className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 flex items-center"
               onClick={() => {
-                // TODO: Implement the actual start consultations logic here
-                alert('Iniciar Consultas button clicked.  Implement the logic to start consultations.');
+                if (clients.length === 0) {
+                  alert('Por favor, importe os clientes primeiro.');
+                  return;
+                }
+
+                // Iterate through clients and call the API for each one
+                clients.forEach(cliente => {
+                  fetch('https://santanacred-n8n-chatwoot.igxlaz.easypanel.host/webhook/consulta', {
+                    method: 'POST',
+                    headers: {
+                      'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ cpf: cliente.CPF }) // Assuming CPF is the correct field name
+                  })
+                  .then(response => response.json())
+                  .then(data => {
+                    console.log('API Response:', data);
+                    // Handle the API response here
+                  })
+                  .catch(error => {
+                    console.error('API Error:', error);
+                    // Handle the error here
+                  });
+                });
+
+                alert('Consultas iniciadas para todos os clientes!');
               }}
             >
               Iniciar Consultas
