@@ -8,53 +8,23 @@ const Campanhas: React.FC = () => {
   const [uploadedFile, setUploadedFile] = useState<File | null>(null);
   const [previewData, setPreviewData] = useState<any[]>([]);
   const [selectedCampanha, setSelectedCampanha] = useState<any>(null);
-  const [campanhas, setCampanhas] = useState<any[]>([
-    {
-      id: 1,
-      nome: 'Campanha Janeiro/2023',
-      status: 'concluido',
-      total: 320,
-      comSaldo: 248,
-      semSaldo: 62,
-      erro: 10,
-      data: '10/01/2023',
-      consultationLogs: [] // Add consultationLogs array
-    },
-    {
-      id: 2,
-      nome: 'Campanha Dezembro/2022',
-      status: 'concluido',
-      total: 450,
-      comSaldo: 312,
-      semSaldo: 123,
-      erro: 15,
-      data: '15/12/2022',
-      consultationLogs: [] // Add consultationLogs array
-    },
-    {
-      id: 3,
-      nome: 'Campanha Novembro/2022',
-      status: 'concluido',
-      total: 275,
-      comSaldo: 183,
-      semSaldo: 82,
-      erro: 10,
-      data: '22/11/2022',
-      consultationLogs: [] // Add consultationLogs array
-    },
-    {
-      id: 4,
-      nome: 'Campanha Fevereiro/2023',
-      status: 'em_andamento',
-      total: 150,
-      processados: 68,
-      data: '05/02/2023',
-      consultationLogs: [] // Add consultationLogs array
-    }
-  ]);
+  const [campanhas, setCampanhas] = useState<any[]>([]);
   const [clients, setClients] = useState<any[]>([]); // Simulated "database" for clients
   const [campaignTimeouts, setCampaignTimeouts] = useState<{ [key: number]: number }>({}); // Store timeouts for pausing
   const [consultationLogs, setConsultationLogs] = useState<any[]>([]);
+
+  useEffect(() => {
+    // Load campaigns from local storage on component mount
+    const storedCampanhas = localStorage.getItem('campanhas');
+    if (storedCampanhas) {
+      setCampanhas(JSON.parse(storedCampanhas));
+    }
+  }, []);
+
+  useEffect(() => {
+    // Save campaigns to local storage whenever the campaigns state changes
+    localStorage.setItem('campanhas', JSON.stringify(campanhas));
+  }, [campanhas]);
 
   // Dados de exemplo para a visualização detalhada da campanha
   const detalheCampanha = {
