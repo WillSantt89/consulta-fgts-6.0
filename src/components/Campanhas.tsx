@@ -1,17 +1,37 @@
 import React, { useState, useEffect } from 'react';
 import { Upload, Download, Play, RefreshCcw, Filter, FileText, ChevronUp, ChevronDown, Pause } from 'lucide-react';
-import Papa from 'papaparse';
+import ImportadorClientes from './ImportadorClientes';
+
+interface Cliente {
+  CPF: string;
+  CLIENTE_NOME?: string;
+  CLIENTE_CELULAR?: string;
+  [key: string]: any;
+}
+
+interface Campanha {
+  id: number;
+  nome: string;
+  status: 'pausada' | 'em_andamento' | 'concluido' | 'agendada';
+  total: number;
+  processados: number;
+  data: string;
+  comSaldo?: number;
+  semSaldo?: number;
+  erro?: number;
+  clientes: Cliente[];
+  consultationLogs: any[];
+}
 
 const Campanhas: React.FC = () => {
   const [activeView, setActiveView] = useState('lista'); // 'lista' ou 'nova' ou 'detalhes'
   const [progress, setProgress] = useState(0);
-  const [uploadedFile, setUploadedFile] = useState<File | null>(null);
-  const [previewData, setPreviewData] = useState<any[]>([]);
-  const [selectedCampanha, setSelectedCampanha] = useState<any>(null);
-  const [campanhas, setCampanhas] = useState<any[]>([]);
-  const [clients, setClients] = useState<any[]>([]); // Simulated "database" for clients
+  const [clients, setClients] = useState<Cliente[]>([]); // Clientes importados
+  const [selectedCampanha, setSelectedCampanha] = useState<Campanha | null>(null);
+  const [campanhas, setCampanhas] = useState<Campanha[]>([]);
   const [campaignTimeouts, setCampaignTimeouts] = useState<{ [key: number]: number }>({}); // Store timeouts for pausing
   const [consultationLogs, setConsultationLogs] = useState<any[]>([]);
+  const [showImportador, setShowImportador] = useState(false);
 
   useEffect(() => {
     // Load campaigns from local storage on component mount
@@ -43,32 +63,11 @@ const Campanhas: React.FC = () => {
     ]
   };
   
-  // Simula upload de arquivo CSV
-  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      setUploadedFile(file);
-      
-      Papa.parse(file, {
-        header: true,
-        complete: (results) => {
-          setPreviewData(results.data);
-        },
-        error: (err) => {
-          console.error("Error parsing CSV:", err);
-          alert("Erro ao processar o arquivo CSV.");
-        }
-      });
-    }
-  };
-  
-  const handleImportClients = () => {
-    if (previewData.length === 0) {
-      alert('Por favor, faça o upload de um arquivo CSV válido.');
-      return;
-    }
-    setClients(previewData);
-    alert('Clientes importados com sucesso!');
+  // Handler para quando a importação de clientes é finalizada
+  const handleClientesImportados = (clientesImportados: Cliente[]) => {
+    setClients(clientesImportados);
+    setShowImportador(false);
+    alert(`${clientesImportados.length} clientes importados com sucesso!`);
   };
   
   // Simulação de início de campanha
@@ -86,7 +85,7 @@ const Campanhas: React.FC = () => {
       return;
     }
     
-    const newCampanha = {
+    const newCampanha: Campanha = {
       id: campanhas.length + 1,
       nome: campanhaNome,
       status: 'pausada', // Inicialmente pausada
@@ -105,8 +104,6 @@ const Campanhas: React.FC = () => {
       campanhaNomeInput.value = '';
     }
     setClients([]);
-    setUploadedFile(null);
-    setPreviewData([]);
   };
 
   const runCampaign = (campanhaId: number) => {
@@ -141,7 +138,7 @@ const Campanhas: React.FC = () => {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ cpf: cliente.CPF }) // Assuming CPF is the correct field name
+        body: JSON.stringify({ cpf: cliente.CPF }) 
       })
       .then(response => response.json())
       .then(data => {
@@ -358,83 +355,20 @@ const Campanhas: React.FC = () => {
         
         <div className="mb-6">
           <label className="block text-sm font-medium text-gray-700 mb-1">
-            Arquivo CSV com CPFs
+            Importar Clientes
           </label>
-          <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-gray-300 border-dashed rounded-md">
-            <div className="space-y-1 text-center">
-              <FileText className="mx-auto h-12 w-12 text-gray-400" />
-              <div className="flex text-sm text-gray-600">
-                <label htmlFor="file-upload" className="relative cursor-pointer bg-white rounded-md font-medium text-green-600 hover:text-green-500 focus-within:outline-none">
-                  <span>Selecionar arquivo</span>
-                  <input 
-                    id="file-upload" 
-                    name="file-upload" 
-                    type="file" 
-                    accept=".csv"
-                    className="sr-only"
-                    onChange={handleFileUpload} 
-                  />
-                </label>
-                <p className="pl-1">ou arraste e solte</p>
-              </div>
-              <p className="text-xs text-gray-500">
-                CSV com colunas: Nome, CPF, Telefone
-              </p>
-            </div>
-          </div>
+          <button
+            onClick={() => setShowImportador(true)}
+            className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 flex items-center"
+          >
+            <Upload className="h-4 w-4 mr-2" />
+            Importar do Arquivo
+          </button>
         </div>
-        
-        {uploadedFile && (
+
+        {showImportador && (
           <div className="mb-6">
-            <h3 className="text-md font-medium text-gray-700 mb-2">
-              Preview: {uploadedFile.name}
-            </h3>
-            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 overflow-x-auto">
-              <table className="min-w-full divide-y divide-gray-200">
-                <thead className="bg-gray-50">
-                  <tr>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Nome
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      CPF
-                    </th>
-                    <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                      Telefone
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="bg-white divide-y divide-gray-200">
-                  {previewData.map((row, index) => (
-                    <tr key={index}>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                        {row['CLIENTE_NOME']}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                        {row['CPF']}
-                      </td>
-                      <td className="px-4 py-2 whitespace-nowrap text-sm text-gray-500">
-                        {row['CLIENTE_CELULAR']}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            <p className="text-xs text-gray-500 mt-1">
-              Mostrando {previewData.length} de {previewData.length} registros
-            </p>
-          </div>
-        )}
-        
-        {previewData.length > 0 && (
-          <div className="mb-6">
-            <button
-              onClick={handleImportClients}
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700"
-            >
-              Importar
-            </button>
+            <ImportadorClientes onClientesImportados={handleClientesImportados} />
           </div>
         )}
         
@@ -503,44 +437,6 @@ const Campanhas: React.FC = () => {
             >
               <Play className="h-4 w-4 mr-2" />
               Iniciar Campanha
-            </button>
-          </div>
-        )}
-        
-        {clients.length > 0 && (
-          <div className="flex justify-end space-x-3 mt-4">
-            <button
-              className="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 flex items-center"
-              onClick={() => {
-                if (clients.length === 0) {
-                  alert('Por favor, importe os clientes primeiro.');
-                  return;
-                }
-
-                // Iterate through clients and call the API for each one
-                clients.forEach(cliente => {
-                  fetch('https://santanacred-n8n-chatwoot.igxlaz.easypanel.host/webhook/consulta', {
-                    method: 'POST',
-                    headers: {
-                      'Content-Type': 'application/json'
-                    },
-                    body: JSON.stringify({ cpf: cliente.CPF }) // Assuming CPF is the correct field name
-                  })
-                  .then(response => response.json())
-                  .then(data => {
-                    console.log('API Response:', data);
-                    // Handle the API response here
-                  })
-                  .catch(error => {
-                    console.error('API Error:', error);
-                    // Handle the error here
-                  });
-                });
-
-                alert('Consultas iniciadas para todos os clientes!');
-              }}
-            >
-              Iniciar Consultas
             </button>
           </div>
         )}
