@@ -345,6 +345,37 @@ const ConsultaLote: React.FC = () => {
       }
     }
 
+    // Após concluir o processamento, salva os clientes com saldo no localStorage para o disparo de WhatsApp
+    if (results) {
+      const clientesComSaldo = results.detalhes
+        .filter(item => item.status === 'com_saldo')
+        .map(item => ({
+          id: item.id,
+          cpf: item.cpf,
+          nome: item.nome || '',
+          telefone: item.telefone || '',
+          valorLiberado: item.valorLiberado || 0,
+          banco: item.banco || '',
+          status: 'pendente' as const,
+          dataConsulta: new Date().toISOString(),
+          apiResponse: item.apiResponse
+        }));
+
+      // Verifica se já existem clientes salvos e adiciona os novos
+      const clientesArmazenados = localStorage.getItem('clientesComSaldoFGTS');
+      let todosClientes = clientesComSaldo;
+      
+      if (clientesArmazenados) {
+        const clientesAnteriores = JSON.parse(clientesArmazenados);
+        // Combina os clientes antigos com os novos, evitando duplicatas por CPF
+        const cpfsNovos = new Set(clientesComSaldo.map(c => c.cpf));
+        const clientesFiltrados = clientesAnteriores.filter((c: any) => !cpfsNovos.has(c.cpf));
+        todosClientes = [...clientesFiltrados, ...clientesComSaldo];
+      }
+      
+      localStorage.setItem('clientesComSaldoFGTS', JSON.stringify(todosClientes));
+    }
+
     setIsProcessing(false);
     setProcessingProgress(100);
   };
