@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { BarChart, User, Users } from 'lucide-react';
 import Dashboard from './components/Dashboard';
 import ConsultaIndividual from './components/ConsultaIndividual';
-import Campanhas from './components/Campanhas';
+// import Campanhas from './components/Campanhas'; // Removed import
 
 const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState(0);
@@ -14,8 +14,8 @@ const App: React.FC = () => {
         return <Dashboard />;
       case 1:
         return <ConsultaIndividual />;
-      case 2:
-        return <Campanhas />;
+      // case 2: // Removed case for Campanhas
+      //   return <Campanhas />;
       default:
         return <Dashboard />;
     }
@@ -74,7 +74,7 @@ const App: React.FC = () => {
                 Consulta Individual
               </div>
             </button>
-            <button
+            {/* <button // Removed Campanhas tab button
               onClick={() => setActiveTab(2)}
               className={`px-4 py-2 font-medium text-sm cursor-pointer ${
                 activeTab === 2 
@@ -86,7 +86,7 @@ const App: React.FC = () => {
                 <Users className="w-4 h-4 mr-2" />
                 Campanhas
               </div>
-            </button>
+            </button> */}
           </div>
           
           {/* Conteúdo da aba ativa */}
