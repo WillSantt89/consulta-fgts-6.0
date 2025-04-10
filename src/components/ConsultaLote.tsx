@@ -3,12 +3,14 @@ import { Upload, RefreshCw, FileText, AlertCircle, CheckCircle, XCircle, Downloa
 import Papa from 'papaparse';
 
 interface ProcessedResult {
+  id: string;
   cpf: string;
   nome?: string;
   telefone?: string;
   status: 'com_saldo' | 'sem_saldo' | 'erro' | 'pendente';
   valorLiberado?: number;
   mensagem?: string;
+  log?: string;
 }
 
 interface ResultsSummary {
@@ -30,6 +32,12 @@ const ConsultaLote: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Função para gerar um ID único
+  const generateUniqueId = (index: number): string => {
+    const timestamp = new Date().getTime();
+    return `REQ${timestamp}${index.toString().padStart(4, '0')}`;
+  };
 
   // Função para lidar com o upload do arquivo
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -64,6 +72,17 @@ const ConsultaLote: React.FC = () => {
     return true;
   };
 
+  // Função para formatar o CPF
+  const formatarCPF = (cpf: string): string => {
+    // Remove caracteres não numéricos
+    const cpfNumerico = cpf.replace(/\D/g, '');
+
+    // Completa com zeros à esquerda se for menor que 11 dígitos
+    const cpfPreenchido = cpfNumerico.padStart(11, '0');
+
+    return cpfPreenchido;
+  };
+
   // Função para analisar o arquivo CSV
   const parseFile = (file: File) => {
     if (!validateFile(file)) return;
@@ -92,7 +111,10 @@ const ConsultaLote: React.FC = () => {
 
           // Validar o conteúdo do CSV
           const errors: string[] = [];
-          const validatedData = results.data.filter((row: any, index: number) => {
+          const validatedData = results.data.map((row: any, index: number) => {
+            // Adicionar ID único para cada registro
+            const id = row.ID || generateUniqueId(index);
+
             // Encontrar a coluna de CPF
             const cpfColumn = Object.keys(row).find(key =>
               key === 'CPF' || key === 'cpf' || key === 'Cpf' || key === 'CPF_CLIENTE'
@@ -100,18 +122,18 @@ const ConsultaLote: React.FC = () => {
 
             if (!cpfColumn || !row[cpfColumn]) {
               errors.push(`Linha ${index + 2}: CPF não encontrado ou vazio`);
-              return false;
+              return null;
             }
 
-            // Validar o formato do CPF
-            const cpf = row[cpfColumn].toString().replace(/[^\d]/g, '');
-            if (cpf.length !== 11) {
-              errors.push(`Linha ${index + 2}: CPF inválido (deve ter 11 dígitos): ${row[cpfColumn]}`);
-              return false;
-            }
+            // Formatar o CPF
+            const cpfFormatado = formatarCPF(row[cpfColumn]);
 
-            return true;
-          });
+            return {
+              ...row,
+              ID: id,
+              CPF: cpfFormatado
+            };
+          }).filter(Boolean);
 
           setParsedData(validatedData);
           setValidationErrors(errors);
@@ -134,7 +156,7 @@ const ConsultaLote: React.FC = () => {
   };
 
   // Função que faz a consulta real para um CPF
-  const consultarCpf = async (cpf: string): Promise<ProcessedResult> => {
+  const consultarCpf = async (cpf: string, id: string): Promise<ProcessedResult> => {
     try {
       const cpfNumerico = cpf.replace(/[^\d]/g, '');
 
@@ -147,36 +169,49 @@ const ConsultaLote: React.FC = () => {
       });
 
       if (!response.ok) {
+        const logMessage = `Erro na consulta: ${response.status} - ${response.statusText}`;
         return {
+          id: id,
           cpf: cpf,
           status: 'erro',
-          mensagem: `Erro ${response.status}: ${response.statusText}`
+          mensagem: `Erro ${response.status}: ${response.statusText}`,
+          log: logMessage
         };
       }
 
       const data = await response.json();
+      let logMessage = '';
 
       // Processa a resposta
       if (data.codigo === "SIM") {
+        logMessage = `Consulta OK: Saldo disponível - R$ ${data.valorliberado}`;
         return {
+          id: id,
           cpf: cpf,
           nome: data.nome || '',
           status: 'com_saldo',
-          valorLiberado: parseFloat(data.valorliberado || '0')
+          valorLiberado: parseFloat(data.valorliberado || '0'),
+          log: logMessage
         };
       } else {
+        logMessage = `Consulta OK: Sem saldo disponível`;
         return {
+          id: id,
           cpf: cpf,
           nome: data.nome || '',
           status: 'sem_saldo',
-          valorLiberado: 0
+          valorLiberado: 0,
+          log: logMessage
         };
       }
     } catch (error) {
+      const logMessage = `Erro na consulta: ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
       return {
+        id: id,
         cpf: cpf,
         status: 'erro',
-        mensagem: error instanceof Error ? error.message : 'Erro desconhecido'
+        mensagem: error instanceof Error ? error.message : 'Erro desconhecido',
+        log: logMessage
       };
     }
   };
@@ -191,16 +226,6 @@ const ConsultaLote: React.FC = () => {
     setIsProcessing(true);
     setProcessingProgress(0);
 
-    const cpfColumn = Object.keys(parsedData[0]).find(key =>
-      key === 'CPF' || key === 'cpf' || key === 'Cpf' || key === 'CPF_CLIENTE'
-    );
-
-    if (!cpfColumn) {
-      setError('Coluna de CPF não encontrada nos dados.');
-      setIsProcessing(false);
-      return;
-    }
-
     // Inicializa os resultados
     const initialResults: ResultsSummary = {
       total: parsedData.length,
@@ -209,10 +234,11 @@ const ConsultaLote: React.FC = () => {
       erros: 0,
       pendentes: parsedData.length,
       detalhes: parsedData.map(row => ({
-        cpf: row[cpfColumn],
-        nome: row['NOME'] || row['nome'] || row['Nome'] || row['CLIENTE_NOME'] || '',
-        telefone: row['TELEFONE'] || row['telefone'] || row['Telefone'] || row['CLIENTE_CELULAR'] || '',
-        status: 'pendente'
+        id: row.ID || generateUniqueId(parsedData.indexOf(row)),
+        cpf: row.CPF,
+        nome: row.CLIENTE_NOME || row.nome || row.Nome || '',
+        telefone: row.CLIENTE_CELULAR || row.telefone || row.Telefone || '',
+        status: 'pendente',
       }))
     };
 
@@ -226,7 +252,7 @@ const ConsultaLote: React.FC = () => {
       const batch = parsedData.slice(i, i + batchSize);
 
       // Cria um array de promessas para processar em paralelo
-      const promises = batch.map(row => consultarCpf(row[cpfColumn]));
+      const promises = batch.map(row => consultarCpf(row.CPF, row.ID || generateUniqueId(parsedData.indexOf(row))));
 
       try {
         const batchResults = await Promise.all(promises);
@@ -241,7 +267,7 @@ const ConsultaLote: React.FC = () => {
           let newErros = prevResults.erros;
 
           batchResults.forEach(result => {
-            const index = updatedDetails.findIndex(d => d.cpf === result.cpf);
+            const index = updatedDetails.findIndex(d => d.id === result.id);
             if (index !== -1) {
               updatedDetails[index] = result;
 
@@ -294,24 +320,40 @@ const ConsultaLote: React.FC = () => {
 
   // Função para baixar os resultados
   const downloadResults = () => {
-    if (!results) return;
+    if (!results || !file) return;
 
-    // Criando conteúdo CSV
-    let csvContent = "CPF,Nome,Telefone,Status,Valor Liberado,Mensagem\n";
+    // Extract headers from the original file
+    const originalHeaders = parsedData.length > 0 ? Object.keys(parsedData[0]) : [];
 
-    results.detalhes.forEach((item) => {
+    // Define the headers for the CSV export
+    const exportHeaders = [...originalHeaders, "Status", "Valor Liberado", "Mensagem", "Log"];
+
+    // Prepare CSV content
+    let csvContent = exportHeaders.map(header => `"${header}"`).join(",") + "\n";
+
+    results.detalhes.forEach((item, index) => {
+      const originalData = parsedData[index] || {};
+
       const status = item.status === 'com_saldo' ? 'Com Saldo' :
         item.status === 'sem_saldo' ? 'Sem Saldo' :
         item.status === 'pendente' ? 'Pendente' : 'Erro';
       const valor = item.valorLiberado ? item.valorLiberado.toFixed(2) : '0.00';
       const mensagem = item.mensagem || '';
-      const nome = item.nome || '';
-      const telefone = item.telefone || '';
+      const log = item.log || '';
 
-      csvContent += `${item.cpf},"${nome}","${telefone}",${status},${valor},"${mensagem}"\n`;
+      // Map original data and add the new fields
+      const row = exportHeaders.map(header => {
+        if (header === "Status") return status;
+        if (header === "Valor Liberado") return valor;
+        if (header === "Mensagem") return `"${mensagem}"`;
+        if (header === "Log") return `"${log}"`;
+        return `"${originalData[header] || ''}"`;
+      }).join(",");
+
+      csvContent += row + "\n";
     });
 
-    // Criando o blob e link para download
+    // Create a blob and trigger the download
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
@@ -408,6 +450,9 @@ const ConsultaLote: React.FC = () => {
               <thead className="bg-gray-50">
                 <tr>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    ID
+                  </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     CPF
                   </th>
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -422,11 +467,17 @@ const ConsultaLote: React.FC = () => {
                   <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Mensagem
                   </th>
+                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                    Log
+                  </th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {results.detalhes.map((item, index) => (
                   <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {item.id}
+                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {item.cpf}
                     </td>
@@ -464,6 +515,9 @@ const ConsultaLote: React.FC = () => {
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {item.mensagem || '-'}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                      {item.log || '-'}
                     </td>
                   </tr>
                 ))}
