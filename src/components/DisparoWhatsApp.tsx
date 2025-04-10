@@ -626,28 +626,4 @@ const DisparoWhatsApp: React.FC = () => {
       </div>
     </div>
   );
-};<boltAction type="file" filePath="src/App.tsx">import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Dashboard from './components/Dashboard';
-import ConsultaIndividual from './components/ConsultaIndividual';
-import ConsultaLote from './components/ConsultaLote';
-import DisparoWhatsApp from './components/DisparoWhatsApp';
-import Layout from './components/Layout';
-
-const App: React.FC = () => {
-  return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="consulta" element={<ConsultaIndividual />} />
-          <Route path="consulta-lote" element={<ConsultaLote />} />
-          <Route path="disparo-whatsapp" element={<DisparoWhatsApp />} />
-          {/* Add more routes for other features here */}
-        </Route>
-      </Routes>
-    </Router>
-  );
 };
-
-export default App;
