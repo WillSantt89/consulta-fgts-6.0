@@ -1,5 +1,5 @@
-import React, { useState, useRef } from 'react';
-    import { Upload, FileText, AlertCircle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
+import React, { useState, useRef, useEffect } from 'react';
+    import { Upload, FileText, AlertCircle, CheckCircle, XCircle, RefreshCw, Code } from 'lucide-react';
     import Papa from 'papaparse';
 
     interface ClienteCSV {
@@ -7,6 +7,10 @@ import React, { useState, useRef } from 'react';
       cpf: string;
       telefone: string;
       status: string;
+    }
+
+    interface CpfPayload {
+      cpf: string[];
     }
 
     const VctexEmLote: React.FC = () => {
@@ -17,6 +21,8 @@ import React, { useState, useRef } from 'react';
       const [parsedData, setParsedData] = useState<ClienteCSV[]>([]);
       const [error, setError] = useState<string | null>(null);
       const [validationErrors, setValidationErrors] = useState<string[]>([]);
+      const [filteredClientes, setFilteredClientes] = useState<string[]>([]);
+      const [cpfPayload, setCpfPayload] = useState<CpfPayload | null>(null);
       const fileInputRef = useRef<HTMLInputElement>(null);
 
       // Função para validar o formato do arquivo
@@ -140,10 +146,34 @@ import React, { useState, useRef } from 'react';
         });
       };
 
+      // Efeito para filtrar os clientes com status "pendente" sempre que os dados mudam
+      useEffect(() => {
+        if (parsedData.length > 0) {
+          // Filtrar clientes com status "pendente" (case insensitive)
+          const clientesPendentes = parsedData
+            .filter(cliente => cliente.status.toLowerCase() === 'pendente')
+            .map(cliente => cliente.cpf);
+
+          setFilteredClientes(clientesPendentes);
+
+          // Criar o objeto JSON no formato esperado
+          if (clientesPendentes.length > 0) {
+            setCpfPayload({ cpf: clientesPendentes });
+          } else {
+            setCpfPayload(null);
+          }
+        } else {
+          setFilteredClientes([]);
+          setCpfPayload(null);
+        }
+      }, [parsedData]);
+
       // Função para limpar o formulário
       const handleReset = () => {
         setFile(null);
         setParsedData([]);
+        setFilteredClientes([]);
+        setCpfPayload(null);
         setError(null);
         setValidationErrors([]);
         setIsUploading(false);
@@ -331,6 +361,27 @@ import React, { useState, useRef } from 'react';
                     <div className="mt-4 p-3 bg-green-50 text-green-700 rounded-md flex items-center">
                       <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0" />
                       <p className="text-sm">{successMessage}</p>
+                    </div>
+                  )}
+                  
+                  {/* Exibir a estrutura JSON de CPFs com status "pendente" */}
+                  {successMessage && cpfPayload && (
+                    <div className="mt-4">
+                      <div className="flex items-center justify-between mb-2">
+                        <h3 className="text-sm font-medium text-gray-700">CPFs com status "pendente"</h3>
+                        <span className="text-xs text-blue-600 bg-blue-50 px-2 py-1 rounded">
+                          {filteredClientes.length} CPFs
+                        </span>
+                      </div>
+                      <div className="bg-gray-800 text-green-400 p-4 rounded-lg overflow-x-auto font-mono text-sm">
+                        <div className="flex items-center mb-2">
+                          <Code className="h-4 w-4 mr-2" />
+                          <span className="text-gray-400 text-xs">Payload JSON para próxima etapa:</span>
+                        </div>
+                        <pre>
+                          {JSON.stringify(cpfPayload, null, 2)}
+                        </pre>
+                      </div>
                     </div>
                   )}
                 </div>
