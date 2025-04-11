@@ -1,9 +1,18 @@
 import React, { useState, useEffect } from 'react';
-    import { Search, Calendar, RefreshCw, ChevronLeft, ChevronRight, AlertCircle, Filter, X } from 'lucide-react';
+    import { Search, Calendar, RefreshCw, ChevronLeft, ChevronRight, AlertCircle, Filter, X, List, FileText, Copy } from 'lucide-react';
 
     interface Protocolo {
       data: string;
       protocolo: string;
+    }
+
+    interface ConsultaResponse {
+      slc: {
+        body: {
+          cpf: string[];
+        };
+      };
+      [key: string]: any;
     }
 
     const VctexProtocolos: React.FC = () => {
@@ -116,6 +125,59 @@ import React, { useState, useEffect } from 'react';
       // Handle page change
       const handlePageChange = (newPage: number) => {
         setCurrentPage(newPage);
+      };
+      
+      // States for CPF consultation
+      const [consultingProtocolo, setConsultingProtocolo] = useState<string | null>(null);
+      const [consultaResponse, setConsultaResponse] = useState<string[] | null>(null);
+      const [consultaError, setConsultaError] = useState<string | null>(null);
+      const [showCpfsModal, setShowCpfsModal] = useState<boolean>(false);
+      
+      // Function to consult CPFs for a specific protocol
+      const consultarCpfs = async (protocolo: string) => {
+        setConsultingProtocolo(protocolo);
+        setConsultaError(null);
+        
+        try {
+          const response = await fetch('https://n8n-queue-2-n8n-webhook.igxlaz.easypanel.host/webhook/vctex/consultalote', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({ protocolo })
+          });
+          
+          if (!response.ok) {
+            throw new Error(`Erro ao consultar CPFs: ${response.status} ${response.statusText}`);
+          }
+          
+          const data: ConsultaResponse = await response.json();
+          
+          // Extract CPF list from the response
+          if (data.slc && data.slc.body && data.slc.body.cpf && Array.isArray(data.slc.body.cpf)) {
+            setConsultaResponse(data.slc.body.cpf);
+            setShowCpfsModal(true);
+          } else {
+            setConsultaError('Formato de resposta inválido ou nenhum CPF encontrado.');
+          }
+        } catch (err) {
+          console.error('Erro ao consultar CPFs:', err);
+          setConsultaError(err instanceof Error ? err.message : 'Erro ao consultar os CPFs do protocolo');
+        } finally {
+          setConsultingProtocolo(null);
+        }
+      };
+      
+      // Function to copy CPFs to clipboard
+      const copyCpfsToClipboard = () => {
+        if (!consultaResponse) return;
+        
+        const cpfsText = consultaResponse.join('\n');
+        navigator.clipboard.writeText(cpfsText).then(() => {
+          alert('CPFs copiados para a área de transferência!');
+        }).catch(err => {
+          console.error('Erro ao copiar CPFs:', err);
+        });
       };
       
       // Calculate items to display based on current page
@@ -249,11 +311,28 @@ import React, { useState, useEffect } from 'react';
                             {protocolo.protocolo}
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                            {/* Placeholder for action buttons - will be implemented in next steps */}
                             <div className="flex justify-end space-x-2">
-                              <span className="px-3 py-1 bg-gray-100 text-gray-500 rounded text-xs">
-                                Ações
-                              </span>
+                              <button
+                                onClick={() => consultarCpfs(protocolo.protocolo)}
+                                disabled={consultingProtocolo === protocolo.protocolo}
+                                className={`px-3 py-1 rounded text-xs flex items-center ${
+                                  consultingProtocolo === protocolo.protocolo
+                                    ? 'bg-blue-100 text-blue-400 cursor-not-allowed'
+                                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                                }`}
+                              >
+                                {consultingProtocolo === protocolo.protocolo ? (
+                                  <>
+                                    <RefreshCw className="h-3 w-3 mr-1 animate-spin" />
+                                    Consultando...
+                                  </>
+                                ) : (
+                                  <>
+                                    <List className="h-3 w-3 mr-1" />
+                                    Consultar CPFs
+                                  </>
+                                )}
+                              </button>
                             </div>
                           </td>
                         </tr>
@@ -320,6 +399,83 @@ import React, { useState, useEffect } from 'react';
               </>
             )}
           </div>
+          
+          {/* Modal para exibir os CPFs */}
+          {showCpfsModal && (
+            <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center">
+              <div className="bg-white rounded-lg shadow-xl max-w-md w-full max-h-[80vh] flex flex-col">
+                <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
+                  <div className="flex items-center">
+                    <FileText className="h-5 w-5 text-blue-500 mr-2" />
+                    <h3 className="text-lg font-medium text-gray-800">
+                      CPFs do Protocolo
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => setShowCpfsModal(false)}
+                    className="text-gray-400 hover:text-gray-500"
+                  >
+                    <X className="h-5 w-5" />
+                  </button>
+                </div>
+                
+                <div className="p-6 overflow-y-auto flex-grow">
+                  {consultaError ? (
+                    <div className="bg-red-50 p-4 rounded-lg text-red-700 flex items-center">
+                      <AlertCircle className="h-5 w-5 mr-2" />
+                      <span>{consultaError}</span>
+                    </div>
+                  ) : consultaResponse && consultaResponse.length > 0 ? (
+                    <>
+                      <div className="flex justify-between items-center mb-4">
+                        <p className="text-sm text-gray-500">
+                          {consultaResponse.length} CPFs encontrados
+                        </p>
+                        <button
+                          onClick={copyCpfsToClipboard}
+                          className="flex items-center text-blue-600 hover:text-blue-800 text-sm"
+                        >
+                          <Copy className="h-4 w-4 mr-1" />
+                          Copiar todos
+                        </button>
+                      </div>
+                      
+                      <div className="bg-gray-50 p-4 rounded-lg border border-gray-200 max-h-80 overflow-y-auto">
+                        <ul className="divide-y divide-gray-200">
+                          {consultaResponse.map((cpf, index) => (
+                            <li key={index} className="py-2 flex items-center justify-between">
+                              <span className="text-sm font-mono">{cpf}</span>
+                              <button
+                                onClick={() => navigator.clipboard.writeText(cpf)}
+                                className="text-gray-400 hover:text-gray-600"
+                                title="Copiar CPF"
+                              >
+                                <Copy className="h-4 w-4" />
+                              </button>
+                            </li>
+                          ))}
+                        </ul>
+                      </div>
+                    </>
+                  ) : (
+                    <div className="bg-yellow-50 p-4 rounded-lg text-yellow-700 flex items-center">
+                      <AlertCircle className="h-5 w-5 mr-2" />
+                      <span>Nenhum CPF encontrado para este protocolo.</span>
+                    </div>
+                  )}
+                </div>
+                
+                <div className="px-6 py-4 border-t border-gray-200 flex justify-end">
+                  <button
+                    onClick={() => setShowCpfsModal(false)}
+                    className="px-4 py-2 bg-gray-200 text-gray-700 rounded-md hover:bg-gray-300"
+                  >
+                    Fechar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       );
     };
