@@ -1,25 +1,27 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Dashboard from './components/Dashboard';
-import ConsultaIndividual from './components/ConsultaIndividual';
-import ConsultaLote from './components/ConsultaLote';
-import Layout from './components/Layout';
-import HistoricoConsultas from './components/HistoricoConsultas';
+    import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
+    import Dashboard from './components/Dashboard';
+    import ConsultaIndividual from './components/ConsultaIndividual';
+    import ConsultaLote from './components/ConsultaLote';
+    import Layout from './components/Layout';
+    import HistoricoConsultas from './components/HistoricoConsultas';
+    import BuscarClientes from './components/BuscarClientes';
 
-const App: React.FC = () => {
-  return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Layout />}>
-          <Route index element={<Dashboard />} />
-          <Route path="consulta" element={<ConsultaIndividual />} />
-          <Route path="consulta-lote" element={<ConsultaLote />} />
-          <Route path="historico-consultas" element={<HistoricoConsultas />} />
-          {/* Add more routes for other features here */}
-        </Route>
-      </Routes>
-    </Router>
-  );
-};
+    const App: React.FC = () => {
+      return (
+        <Router>
+          <Routes>
+            <Route path="/" element={<Layout />}>
+              <Route index element={<Dashboard />} />
+              <Route path="consulta" element={<ConsultaIndividual />} />
+              <Route path="consulta-lote" element={<ConsultaLote />} />
+              <Route path="historico-consultas" element={<HistoricoConsultas />} />
+              <Route path="buscar-clientes" element={<BuscarClientes />} />
+              {/* Add more routes for other features here */}
+            </Route>
+          </Routes>
+        </Router>
+      );
+    };
 
-export default App;
+    export default App;
