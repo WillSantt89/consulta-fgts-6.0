@@ -4,6 +4,7 @@ import Dashboard from './components/Dashboard';
 import ConsultaIndividual from './components/ConsultaIndividual';
 import ConsultaLote from './components/ConsultaLote';
 import Layout from './components/Layout';
+import HistoricoConsultas from './components/HistoricoConsultas';
 
 const App: React.FC = () => {
   return (
@@ -13,6 +14,7 @@ const App: React.FC = () => {
           <Route index element={<Dashboard />} />
           <Route path="consulta" element={<ConsultaIndividual />} />
           <Route path="consulta-lote" element={<ConsultaLote />} />
+          <Route path="historico-consultas" element={<HistoricoConsultas />} />
           {/* Add more routes for other features here */}
         </Route>
       </Routes>

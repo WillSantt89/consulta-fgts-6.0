@@ -1,6 +1,7 @@
 import React from 'react';
 import { Outlet, Link } from 'react-router-dom';
-import { BarChart, User, Users, MessageSquare } from 'lucide-react';
+import { BarChart, User, Users, MessageSquare, History } from 'lucide-react';
+import HistoricoConsultas from './HistoricoConsultas';
 
 const Layout: React.FC = () => {
   return (
@@ -28,6 +29,12 @@ const Layout: React.FC = () => {
               <Link to="/consulta-lote" className="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
                 <Users className="w-5 h-5 mr-2" />
                 Consulta em Lote
+              </Link>
+            </li>
+            <li>
+              <Link to="/historico-consultas" className="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+                <History className="w-5 h-5 mr-2" />
+                Histórico de Consultas
               </Link>
             </li>
             <li>
