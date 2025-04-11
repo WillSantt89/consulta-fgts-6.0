@@ -7,6 +7,7 @@ import React from 'react';
     import HistoricoConsultas from './components/HistoricoConsultas';
     import BuscarClientes from './components/BuscarClientes';
     import VctexEmLote from './components/VctexEmLote';
+    import VctexProtocolos from './components/VctexProtocolos';
 
     const App: React.FC = () => {
       return (
@@ -18,6 +19,7 @@ import React from 'react';
               <Route path="consulta-lote" element={<ConsultaLote />} />
               <Route path="historico-consultas" element={<HistoricoConsultas />} />
               <Route path="vctex-lote" element={<VctexEmLote />} />
+              <Route path="vctex-protocolos" element={<VctexProtocolos />} />
               <Route path="clientes/buscar" element={<BuscarClientes />} />
               {/* Add more routes for other features here */}
             </Route>
