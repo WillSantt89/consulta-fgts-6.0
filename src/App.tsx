@@ -16,7 +16,7 @@ import React from 'react';
               <Route path="consulta" element={<ConsultaIndividual />} />
               <Route path="consulta-lote" element={<ConsultaLote />} />
               <Route path="historico-consultas" element={<HistoricoConsultas />} />
-              <Route path="buscar-clientes" element={<BuscarClientes />} />
+              <Route path="clientes/buscar" element={<BuscarClientes />} />
               {/* Add more routes for other features here */}
             </Route>
           </Routes>
