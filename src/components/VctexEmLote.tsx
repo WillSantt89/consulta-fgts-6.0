@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-    import { Upload, FileText, AlertCircle, CheckCircle, XCircle, RefreshCw, Code } from 'lucide-react';
+    import { Upload, FileText, AlertCircle, CheckCircle, XCircle, RefreshCw, Code, Info } from 'lucide-react';
     import Papa from 'papaparse';
 
     interface ClienteCSV {
@@ -13,17 +13,31 @@ import React, { useState, useRef, useEffect } from 'react';
       cpf: string[];
     }
 
+    interface ApiResponse {
+      message: string;
+      sessionId: string;
+      batchQueryId: string;
+      batchQueriesLimit: number;
+      batchQueriesToBeDoneOnThisMonth: number;
+      listOfbatchQueriesToBeMadeAtTheEndOfTheDay: string[];
+      protocolo: string;
+    }
+
     const VctexEmLote: React.FC = () => {
       const [file, setFile] = useState<File | null>(null);
       const [isUploading, setIsUploading] = useState(false);
       const [isSending, setIsSending] = useState(false);
+      const [isBatchConsulting, setIsBatchConsulting] = useState(false);
       const [successMessage, setSuccessMessage] = useState<string | null>(null);
+      const [batchConsultationSuccess, setBatchConsultationSuccess] = useState<boolean>(false);
       const [parsedData, setParsedData] = useState<ClienteCSV[]>([]);
       const [error, setError] = useState<string | null>(null);
       const [validationErrors, setValidationErrors] = useState<string[]>([]);
       const [filteredClientes, setFilteredClientes] = useState<string[]>([]);
       const [cpfPayload, setCpfPayload] = useState<CpfPayload | null>(null);
+      const [apiResponse, setApiResponse] = useState<ApiResponse | null>(null);
       const fileInputRef = useRef<HTMLInputElement>(null);
+      const [showDetails, setShowDetails] = useState(false);
 
       // Função para validar o formato do arquivo
       const validateFile = (file: File): boolean => {
@@ -59,7 +73,8 @@ import React, { useState, useRef, useEffect } from 'react';
           setError(null);
           setValidationErrors([]);
           setSuccessMessage(null);
-
+          setBatchConsultationSuccess(false); // Reset batch consultation status
+          setApiResponse(null); // Reset API response
           // Analisa o arquivo
           parseFile(selectedFile);
         }
@@ -179,6 +194,8 @@ import React, { useState, useRef, useEffect } from 'react';
         setIsUploading(false);
         setIsSending(false);
         setSuccessMessage(null);
+        setBatchConsultationSuccess(false); // Reset batch consultation status
+        setApiResponse(null); // Reset API response
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
@@ -194,6 +211,8 @@ import React, { useState, useRef, useEffect } from 'react';
         setIsSending(true);
         setError(null);
         setSuccessMessage(null);
+        setBatchConsultationSuccess(false); // Reset batch consultation status
+        setApiResponse(null); // Reset API response
 
         try {
           // Enviar os dados para a API de cadastro
@@ -215,11 +234,55 @@ import React, { useState, useRef, useEffect } from 'react';
           // Definir mensagem de sucesso
           setSuccessMessage(`Dados cadastrados com sucesso! ${parsedData.length} registros foram enviados.`);
 
+          // Call the function to send the CPFs to the batch consultation API
+          if (cpfPayload && cpfPayload.cpf.length > 0) {
+            await sendCpfPayloadToBatchConsultationApi(cpfPayload);
+          }
+
         } catch (error) {
           console.error('Erro ao enviar dados para API:', error);
           setError(error instanceof Error ? error.message : 'Erro ao cadastrar os clientes. Tente novamente mais tarde.');
         } finally {
           setIsSending(false);
+        }
+      };
+
+      // Function to send the CPF payload to the batch consultation API
+      const sendCpfPayloadToBatchConsultationApi = async (payload: CpfPayload) => {
+        if (!payload || !payload.cpf || payload.cpf.length === 0) {
+          console.warn('No CPFs to send for batch consultation.');
+          return;
+        }
+
+        setIsBatchConsulting(true);
+        setError(null); // Reset any previous errors
+        setApiResponse(null); // Reset API response
+
+        try {
+          const response = await fetch('https://santanacred-n8n-chatwoot.igxlaz.easypanel.host/webhook/vctex/lote', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(payload),
+          });
+
+          if (!response.ok) {
+            throw new Error(`Erro ao consultar CPFs em lote: ${response.status} ${response.statusText}`);
+          }
+
+          const data: ApiResponse = await response.json();
+          console.log('Resposta da API de consulta em lote:', data);
+          setApiResponse(data);
+          setBatchConsultationSuccess(true); // Set success state
+          setSuccessMessage(prevMessage => prevMessage ? `${prevMessage} e consulta em lote realizada com sucesso!` : 'Consulta em lote realizada com sucesso!');
+
+        } catch (error) {
+          console.error('Erro ao enviar CPFs para consulta em lote:', error);
+          setError(error instanceof Error ? error.message : 'Erro ao consultar CPFs em lote. Tente novamente mais tarde.');
+          setBatchConsultationSuccess(false); // Ensure success is false on error
+        } finally {
+          setIsBatchConsulting(false);
         }
       };
 
@@ -363,6 +426,13 @@ import React, { useState, useRef, useEffect } from 'react';
                       <p className="text-sm">{successMessage}</p>
                     </div>
                   )}
+
+                  {isBatchConsulting && (
+                    <div className="mt-4 p-3 bg-blue-50 text-blue-700 rounded-md flex items-center">
+                      <RefreshCw className="animate-spin h-5 w-5 mr-2 flex-shrink-0" />
+                      <p className="text-sm">Consultando CPFs em lote...</p>
+                    </div>
+                  )}
                   
                   {/* Exibir a estrutura JSON de CPFs com status "pendente" */}
                   {successMessage && cpfPayload && (
@@ -386,6 +456,49 @@ import React, { useState, useRef, useEffect } from 'react';
                   )}
                 </div>
               )}
+
+              {apiResponse && (
+                <div className="mt-4 p-3 bg-gray-100 rounded-md">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-sm font-medium text-gray-700 mb-2">Dados da Consulta em Lote</h3>
+                    <button
+                      onClick={() => setShowDetails(!showDetails)}
+                      className="text-sm text-gray-500 hover:text-gray-700"
+                    >
+                      <div className="flex items-center">
+                        <Info className="h-4 w-4 mr-1" />
+                        {showDetails ? 'Ocultar Detalhes' : 'Ver Detalhes'}
+                      </div>
+                    </button>
+                  </div>
+                  <p className="text-sm text-gray-700">
+                    <strong>Mensagem:</strong> {apiResponse.message}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    <strong>Protocolo:</strong> {apiResponse.protocolo}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    <strong>Batch Query ID:</strong> {apiResponse.batchQueryId}
+                  </p>
+                  <p className="text-sm text-gray-700">
+                    <strong>Consultas Restantes no Mês:</strong> {apiResponse.batchQueriesToBeDoneOnThisMonth}
+                  </p>
+
+                  {showDetails && (
+                    <div className="mt-2 border-t border-gray-200 pt-2">
+                      <p className="text-xs text-gray-500">
+                        <strong>Session ID:</strong> {apiResponse.sessionId}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        <strong>Batch Queries Limit:</strong> {apiResponse.batchQueriesLimit}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        <strong>Lista de IDs para o fim do dia:</strong> {apiResponse.listOfbatchQueriesToBeMadeAtTheEndOfTheDay.join(', ')}
+                      </p>
+                    </div>
+                  )}
+                </div>
+              )}
             </div>
 
             <div className="flex space-x-3">
@@ -400,9 +513,9 @@ import React, { useState, useRef, useEffect } from 'react';
               <button
                 type="button"
                 onClick={handleImport}
-                disabled={parsedData.length === 0 || isUploading || isSending}
+                disabled={parsedData.length === 0 || isUploading || isSending || isBatchConsulting}
                 className={`flex-1 flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
-                  parsedData.length === 0 || isUploading || isSending
+                  parsedData.length === 0 || isUploading || isSending || isBatchConsulting
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-blue-600 hover:bg-blue-700'
                 }`}
