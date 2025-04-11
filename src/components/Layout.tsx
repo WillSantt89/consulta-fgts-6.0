@@ -1,9 +1,10 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Outlet, Link } from 'react-router-dom';
-import { BarChart, User, Users, MessageSquare, History } from 'lucide-react';
-import HistoricoConsultas from './HistoricoConsultas';
+import { BarChart, User, Users, MessageSquare, History, UserPlus, Database, ChevronDown, ChevronRight, Search } from 'lucide-react';
 
 const Layout: React.FC = () => {
+  const [clientesMenuOpen, setClientesMenuOpen] = useState(false);
+
   return (
     <div className="flex min-h-screen">
       {/* Sidebar */}
@@ -43,7 +44,40 @@ const Layout: React.FC = () => {
                 Disparo WhatsApp
               </Link>
             </li>
-            {/* Add more links for other features here */}
+            
+            {/* Menu Clientes Nova Vida com submenu */}
+            <li className="mt-2">
+              <button 
+                onClick={() => setClientesMenuOpen(!clientesMenuOpen)}
+                className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-700 rounded text-left"
+              >
+                <div className="flex items-center">
+                  <Database className="w-5 h-5 mr-2" />
+                  Clientes Nova Vida
+                </div>
+                {clientesMenuOpen ? 
+                  <ChevronDown className="w-4 h-4" /> : 
+                  <ChevronRight className="w-4 h-4" />
+                }
+              </button>
+              
+              {clientesMenuOpen && (
+                <ul className="pl-6 mt-1 space-y-1">
+                  <li>
+                    <Link to="/clientes/cadastrar" className="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      Cadastrar Cliente
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/clientes/buscar" className="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+                      <Search className="w-4 h-4 mr-2" />
+                      Buscar Clientes
+                    </Link>
+                  </li>
+                </ul>
+              )}
+            </li>
           </ul>
         </nav>
       </aside>
