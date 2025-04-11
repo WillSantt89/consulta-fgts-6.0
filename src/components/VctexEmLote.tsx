@@ -1,5 +1,5 @@
 import React, { useState, useRef } from 'react';
-    import { Upload, FileText, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+    import { Upload, FileText, AlertCircle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
     import Papa from 'papaparse';
 
     interface ClienteCSV {
@@ -12,6 +12,8 @@ import React, { useState, useRef } from 'react';
     const VctexEmLote: React.FC = () => {
       const [file, setFile] = useState<File | null>(null);
       const [isUploading, setIsUploading] = useState(false);
+      const [isSending, setIsSending] = useState(false);
+      const [successMessage, setSuccessMessage] = useState<string | null>(null);
       const [parsedData, setParsedData] = useState<ClienteCSV[]>([]);
       const [error, setError] = useState<string | null>(null);
       const [validationErrors, setValidationErrors] = useState<string[]>([]);
@@ -37,13 +39,9 @@ import React, { useState, useRef } from 'react';
         return true;
       };
 
-      // Função para formatar o CPF (remover caracteres não numéricos e garantir 11 dígitos)
+      // Função para formatar o CPF (remover caracteres não numéricos)
       const formatarCPF = (cpf: string): string => {
-        const cpfLimpo = cpf.replace(/\D/g, ''); // Remove caracteres não numéricos
-        if (cpfLimpo.length < 11) {
-          return cpfLimpo.padStart(11, '0'); // Adiciona zeros à esquerda se necessário
-        }
-        return cpfLimpo.slice(0, 11); // Trunca se tiver mais de 11 dígitos
+        return cpf.replace(/\D/g, '');
       };
 
       // Função para lidar com o upload do arquivo
@@ -53,6 +51,7 @@ import React, { useState, useRef } from 'react';
           setFile(selectedFile);
           setError(null);
           setValidationErrors([]);
+          setSuccessMessage(null);
 
           // Analisa o arquivo
           parseFile(selectedFile);
@@ -107,7 +106,7 @@ import React, { useState, useRef } from 'react';
                 return;
               }
 
-              // Formatar o CPF (remover caracteres não numéricos e garantir 11 dígitos)
+              // Formatar o CPF (remover caracteres não numéricos)
               const cpfFormatado = formatarCPF(row[cpfColumn]);
               
               // Validar o CPF (11 dígitos)
@@ -147,20 +146,50 @@ import React, { useState, useRef } from 'react';
         setError(null);
         setValidationErrors([]);
         setIsUploading(false);
+        setIsSending(false);
+        setSuccessMessage(null);
         if (fileInputRef.current) {
           fileInputRef.current.value = '';
         }
       };
 
-      // Função para simular a importação
-      const handleImport = () => {
+      // Função para enviar os dados para a API de cadastro
+      const handleImport = async () => {
         if (parsedData.length === 0) {
           setError('Não há dados válidos para importar.');
           return;
         }
 
-        // Na etapa 1, apenas mostramos um alerta de sucesso
-        alert(`${parsedData.length} registros estão prontos para importação. Este recurso será implementado na próxima etapa.`);
+        setIsSending(true);
+        setError(null);
+        setSuccessMessage(null);
+
+        try {
+          // Enviar os dados para a API de cadastro
+          const response = await fetch('https://n8n-queue-2-n8n-webhook.igxlaz.easypanel.host/webhook/cadastro/clientes', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(parsedData)
+          });
+
+          if (!response.ok) {
+            throw new Error(`Erro ao cadastrar clientes: ${response.status} ${response.statusText}`);
+          }
+
+          const data = await response.json();
+          console.log('Resposta da API:', data);
+          
+          // Definir mensagem de sucesso
+          setSuccessMessage(`Dados cadastrados com sucesso! ${parsedData.length} registros foram enviados.`);
+
+        } catch (error) {
+          console.error('Erro ao enviar dados para API:', error);
+          setError(error instanceof Error ? error.message : 'Erro ao cadastrar os clientes. Tente novamente mais tarde.');
+        } finally {
+          setIsSending(false);
+        }
       };
 
       return (
@@ -290,10 +319,17 @@ import React, { useState, useRef } from 'react';
                     )}
                   </div>
                   
-                  {validationErrors.length === 0 && (
+                  {validationErrors.length === 0 && parsedData.length > 0 && (
                     <div className="mt-4 p-3 bg-green-50 text-green-700 rounded-md flex items-center">
                       <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0" />
                       <p className="text-sm">{parsedData.length} registros válidos encontrados no arquivo.</p>
+                    </div>
+                  )}
+                  
+                  {successMessage && (
+                    <div className="mt-4 p-3 bg-green-50 text-green-700 rounded-md flex items-center">
+                      <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0" />
+                      <p className="text-sm">{successMessage}</p>
                     </div>
                   )}
                 </div>
@@ -312,14 +348,21 @@ import React, { useState, useRef } from 'react';
               <button
                 type="button"
                 onClick={handleImport}
-                disabled={parsedData.length === 0 || isUploading}
+                disabled={parsedData.length === 0 || isUploading || isSending}
                 className={`flex-1 flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
-                  parsedData.length === 0 || isUploading
+                  parsedData.length === 0 || isUploading || isSending
                     ? 'bg-gray-400 cursor-not-allowed'
                     : 'bg-blue-600 hover:bg-blue-700'
                 }`}
               >
-                Importar
+                {isSending ? (
+                  <>
+                    <RefreshCw className="animate-spin -ml-1 mr-2 h-4 w-4" />
+                    Enviando...
+                  </>
+                ) : (
+                  'Enviar Dados'
+                )}
               </button>
             </div>
           </div>
