@@ -11,7 +11,9 @@ import {
   Filter, 
   FileJson, 
   X,
-  Calendar
+  Calendar,
+  ChevronLeft,
+  ChevronRight
 } from 'lucide-react';
 
 interface Consulta {
@@ -38,8 +40,6 @@ const HistoricoConsultas: React.FC = () => {
   const [selectedConsulta, setSelectedConsulta] = useState<Consulta | null>(null);
   const [showDetails, setShowDetails] = useState<boolean>(false);
   const [showFilters, setShowFilters] = useState<boolean>(false);
-  const [page, setPage] = useState<number>(1);
-  const [totalPages, setTotalPages] = useState<number>(1);
   const [searchTerm, setSearchTerm] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('todos');
   const [bancoFilter, setBancoFilter] = useState<string>('todos');
@@ -48,6 +48,11 @@ const HistoricoConsultas: React.FC = () => {
     end: new Date().toISOString().split('T')[0]
   });
   
+  // Pagination states
+  const [currentPage, setCurrentPage] = useState<number>(1);
+  const [itemsPerPage, setItemsPerPage] = useState<number>(10); // Default items per page
+  const [totalPages, setTotalPages] = useState<number>(1);
+
   // Define estatísticas
   const [statistics, setStatistics] = useState({
     total: 0,
@@ -93,6 +98,12 @@ const HistoricoConsultas: React.FC = () => {
   useEffect(() => {
     fetchConsultas();
   }, []);
+
+  // Efeito para calcular o total de páginas sempre que filteredConsultas ou itemsPerPage mudar
+  useEffect(() => {
+    setTotalPages(Math.ceil(filteredConsultas.length / itemsPerPage));
+    setCurrentPage(1); // Reset to first page when filters change
+  }, [filteredConsultas, itemsPerPage]);
 
   // Aplicar filtros
   const applyFilters = () => {
@@ -242,7 +253,7 @@ const HistoricoConsultas: React.FC = () => {
       default:
         return (
           <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-            <AlertCircle className="h-4 w-4 mr-1" />
+            <AlertCircle className="h-5 w-5 mr-1" />
             Erro
           </span>
         );
@@ -251,6 +262,16 @@ const HistoricoConsultas: React.FC = () => {
 
   // Lista de bancos disponíveis
   const availableBanks = Array.from(new Set(consultas.map(c => c.banco).filter(Boolean)));
+
+  // Handle page change
+  const handlePageChange = (newPage: number) => {
+    setCurrentPage(newPage);
+  };
+
+  // Calculate the range of items to display based on pagination
+  const startIndex = (currentPage - 1) * itemsPerPage;
+  const endIndex = startIndex + itemsPerPage;
+  const consultasToDisplay = filteredConsultas.slice(startIndex, endIndex);
 
   return (
     <div className="grid grid-cols-1 gap-6">
@@ -471,7 +492,7 @@ const HistoricoConsultas: React.FC = () => {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {filteredConsultas.map((consulta, index) => (
+                {consultasToDisplay.map((consulta, index) => (
                   <tr key={consulta.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
                       {formatCPF(consulta.cpf)}
@@ -480,7 +501,7 @@ const HistoricoConsultas: React.FC = () => {
                       {consulta.nome || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {consulta.telefone || '-'}
+                      {formatPhone(consulta.telefone) || '-'}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       {renderStatus(consulta.status)}
@@ -509,6 +530,73 @@ const HistoricoConsultas: React.FC = () => {
                 ))}
               </tbody>
             </table>
+          </div>
+        )}
+
+        {/* Pagination controls */}
+        {totalPages > 1 && (
+          <div className="mt-6 flex items-center justify-between">
+            <div className="flex-1 flex justify-between sm:hidden">
+              <button
+                onClick={() => handlePageChange(currentPage - 1)}
+                disabled={currentPage <= 1}
+                className="relative inline-flex items-center px-4 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 focus:z-10"
+              >
+                <span className="sr-only">Previous</span>
+                <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+              </button>
+              <button
+                onClick={() => handlePageChange(currentPage + 1)}
+                disabled={currentPage >= totalPages}
+                className="ml-3 relative inline-flex items-center px-4 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 focus:z-10"
+              >
+                <span className="sr-only">Next</span>
+                <ChevronRight className="h-5 w-5" aria-hidden="true" />
+              </button>
+            </div>
+            <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
+              <div>
+                <p className="text-sm text-gray-700">
+                  Mostrando
+                  <span className="font-medium">
+                    {startIndex + 1}
+                  </span>
+                  a
+                  <span className="font-medium">
+                    {Math.min(endIndex, filteredConsultas.length)}
+                  </span>
+                  de
+                  <span className="font-medium">
+                    {filteredConsultas.length}
+                  </span>
+                  resultados
+                </p>
+              </div>
+              <div>
+                <nav className="isolate inline-flex rounded-md shadow-sm" aria-label="Pagination">
+                  <button
+                    onClick={() => handlePageChange(currentPage - 1)}
+                    disabled={currentPage <= 1}
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 focus:z-10"
+                  >
+                    <span className="sr-only">Previous</span>
+                    <ChevronLeft className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                  {/* Simple page number display - consider more advanced pagination for many pages */}
+                  <span className="relative inline-flex items-center px-4 py-2 border border-gray-300 bg-white text-sm font-medium text-gray-700">
+                    Página {currentPage} de {totalPages}
+                  </span>
+                  <button
+                    onClick={() => handlePageChange(currentPage + 1)}
+                    disabled={currentPage >= totalPages}
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 focus:z-10"
+                  >
+                    <span className="sr-only">Next</span>
+                    <ChevronRight className="h-5 w-5" aria-hidden="true" />
+                  </button>
+                </nav>
+              </div>
+            </div>
           </div>
         )}
       </div>
