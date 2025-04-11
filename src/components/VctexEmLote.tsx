@@ -37,9 +37,13 @@ import React, { useState, useRef } from 'react';
         return true;
       };
 
-      // Função para formatar o CPF (remover caracteres não numéricos)
+      // Função para formatar o CPF (remover caracteres não numéricos e garantir 11 dígitos)
       const formatarCPF = (cpf: string): string => {
-        return cpf.replace(/\D/g, '');
+        const cpfLimpo = cpf.replace(/\D/g, ''); // Remove caracteres não numéricos
+        if (cpfLimpo.length < 11) {
+          return cpfLimpo.padStart(11, '0'); // Adiciona zeros à esquerda se necessário
+        }
+        return cpfLimpo.slice(0, 11); // Trunca se tiver mais de 11 dígitos
       };
 
       // Função para lidar com o upload do arquivo
@@ -103,7 +107,7 @@ import React, { useState, useRef } from 'react';
                 return;
               }
 
-              // Formatar o CPF (remover caracteres não numéricos)
+              // Formatar o CPF (remover caracteres não numéricos e garantir 11 dígitos)
               const cpfFormatado = formatarCPF(row[cpfColumn]);
               
               // Validar o CPF (11 dígitos)
