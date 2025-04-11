@@ -227,6 +227,30 @@ const ConsultaLote: React.FC = () => {
   // Função para aguardar um determinado tempo
   const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
+  // Função para inserir a consulta na API
+  const inserirConsulta = async (data: any) => {
+    try {
+      const response = await fetch('https://n8n-queue-2-n8n-webhook.igxlaz.easypanel.host/webhook/inserindo-consulta', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(data),
+      });
+
+      if (!response.ok) {
+        console.error('Erro ao inserir consulta na API:', response.status, response.statusText);
+        // You might want to handle the error here, e.g., by setting an error state
+      } else {
+        // Optionally, handle the successful response here
+        console.log('Consulta inserida com sucesso na API');
+      }
+    } catch (error) {
+      console.error('Erro ao inserir consulta na API:', error);
+      // Handle network errors or other exceptions
+    }
+  };
+
   // Função para processar todos os CPFs em lote
   const processAllCpfs = async () => {
     if (parsedData.length === 0) {
@@ -264,10 +288,30 @@ const ConsultaLote: React.FC = () => {
     for (let i = 0; i < parsedData.length; i++) {
       const row = parsedData[i];
       const id = row.ID || generateUniqueId(i);
+      const batchId = 'seu_batch_id'; // Substitua com a lógica real para gerar o batch_id
+      const requestId = generateUniqueId(i); // Gere um request_id único para cada consulta
       
       try {
         // Consulta o CPF atual
         const result = await consultarCpf(row.CPF, id);
+        
+        // Monta o objeto para a API de inserção
+        const consultaData = {
+          batch_id: batchId,
+          request_id: requestId,
+          cpf: result.cpf,
+          nome: result.nome || '',
+          telefone: row.CLIENTE_CELULAR || row.telefone || row.Telefone || '',
+          status: result.status,
+          valor_liberado: result.valorLiberado || 0,
+          banco: result.banco || '',
+          mensagem: result.mensagem || '',
+          log: result.log || '',
+          api_response: result.apiResponse,
+        };
+
+        // Chama a API para inserir a consulta
+        await inserirConsulta(consultaData);
         
         // Atualiza os contadores
         if (result.status === 'com_saldo') comSaldoCount++;
@@ -625,7 +669,8 @@ const ConsultaLote: React.FC = () => {
         </h2>
 
         <div className="mb-6">
-          <p className="text-gray-600 mb-4">
+          <p className="text-gray```typescript
+          600 mb-4">
             Faça o upload de um arquivo CSV contendo uma lista de CPFs para consulta em lote.
             O arquivo deve conter uma coluna com o título "CPF" contendo os números de CPF a serem consultados.
           </p>
