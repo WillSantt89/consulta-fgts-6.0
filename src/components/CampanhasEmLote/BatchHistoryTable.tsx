@@ -21,6 +21,30 @@ const BatchHistoryTable: React.FC<BatchHistoryTableProps> = ({
   searchQuery,
   setSearchQuery,
 }) => {
+
+  const handleStartConsultationClick = async (batchId: string) => {
+    try {
+      const response = await fetch('https://n8n-queue-2-n8n-webhook.mrt7ga.easypanel.host/webhook/iniciando-consulta-lot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ batch_id: batchId }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`Erro ao iniciar a consulta: ${response.status} ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      console.log('Consulta iniciada com sucesso:', data);
+      // Optionally, provide user feedback (e.g., a success message)
+    } catch (error: any) {
+      console.error('Erro ao iniciar a consulta:', error);
+      // Optionally, provide user feedback (e.g., an error message)
+    }
+  };
+
   return (
     <>
       {/* Search input */}
@@ -116,7 +140,7 @@ const BatchHistoryTable: React.FC<BatchHistoryTableProps> = ({
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <div className="flex justify-end space-x-2">
                         <button
-                          onClick={() => handleStartConsultation(item.batch_id)}
+                          onClick={() => handleStartConsultationClick(item.batch_id)}
                           className="px-3 py-1 rounded text-xs flex items-center bg-blue-600 text-white hover:bg-blue-700"
                         >
                           <Play className="h-3 w-3 mr-1" /> Iniciar Consulta
