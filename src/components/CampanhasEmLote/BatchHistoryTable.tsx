@@ -1,8 +1,9 @@
 import React from 'react';
-import { Play, Trash2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Play, Trash2, RefreshCw, AlertCircle, MoreHorizontal } from 'lucide-react';
 import { formatarData } from '../../utils';
 import { BatchItem } from '../../types';
 import { Search } from 'lucide-react';
+import { useState } from 'react';
 
 interface BatchHistoryTableProps {
   apiDataLoading: boolean;
@@ -21,6 +22,7 @@ const BatchHistoryTable: React.FC<BatchHistoryTableProps> = ({
   searchQuery,
   setSearchQuery,
 }) => {
+  const [openPopover, setOpenPopover] = useState<string | null>(null);
 
   const handleStartConsultationClick = async (batchId: string) => {
     try {
@@ -43,6 +45,10 @@ const BatchHistoryTable: React.FC<BatchHistoryTableProps> = ({
       console.error('Erro ao iniciar a consulta:', error);
       // Optionally, provide user feedback (e.g., an error message)
     }
+  };
+
+  const togglePopover = (batchId: string) => {
+    setOpenPopover(openPopover === batchId ? null : batchId);
   };
 
   return (
@@ -80,9 +86,6 @@ const BatchHistoryTable: React.FC<BatchHistoryTableProps> = ({
               <thead className="bg-gray-50">
                 <tr>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Batch ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                     Nome doArquivo
                   </th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -105,9 +108,6 @@ const BatchHistoryTable: React.FC<BatchHistoryTableProps> = ({
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredApiData.map((item) => (
                   <tr key={item.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.batch_id}
-                    </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       {item.file_name}
                     </td>
@@ -137,21 +137,28 @@ const BatchHistoryTable: React.FC<BatchHistoryTableProps> = ({
                         </span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => handleStartConsultationClick(item.batch_id)}
-                          className="px-3 py-1 rounded text-xs flex items-center bg-blue-600 text-white hover:bg-blue-700"
-                        >
-                          <Play className="h-3 w-3 mr-1" /> Iniciar Consulta
-                        </button>
-                        <button
-                          // onClick={() => handleDeleteBatch(item.batch_id)}
-                          className="px-3 py-1 rounded text-xs flex items-center bg-red-600 text-white hover:bg-red-700"
-                        >
-                          <Trash2 className="h-3 w-3 mr-1" /> Excluir
-                        </button>
-                      </div>
+                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium relative">
+                      <button onClick={() => togglePopover(item.batch_id)} className="text-gray-500 hover:text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 rounded-full p-1">
+                        <MoreHorizontal className="h-5 w-5" />
+                      </button>
+                      {openPopover === item.batch_id && (
+                        <div className="absolute right-0 mt-2 w-40 rounded-md shadow-lg py-1 bg-white ring-1 ring-black ring-opacity-5 focus:outline-none z-10">
+                          <button
+                            onClick={() => handleStartConsultationClick(item.batch_id)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center space-x-2"
+                          >
+                            <Play className="h-3 w-3" />
+                            <span>Iniciar Consulta</span>
+                          </button>
+                          <button
+                            // onClick={() => handleDeleteBatch(item.batch_id)}
+                            className="block px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left flex items-center space-x-2"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            <span>Excluir</span>
+                          </button>
+                        </div>
+                      )}
                     </td>
                   </tr>
                 ))}
