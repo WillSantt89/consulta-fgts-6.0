@@ -16,7 +16,9 @@ import {
   ClipboardList,
   Settings,
   KeyRound,
-  Building
+  Building,
+  FileSpreadsheet,
+  ListChecks
 } from 'lucide-react';
 
 const Layout: React.FC = () => {
@@ -24,6 +26,7 @@ const Layout: React.FC = () => {
   const [propostasMenuOpen, setPropostasMenuOpen] = useState(false);
   const [configMenuOpen, setConfigMenuOpen] = useState(false);
   const [factaMenuOpen, setFactaMenuOpen] = useState(false);
+  const [campanhasMenuOpen, setCampanhasMenuOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen">
@@ -75,6 +78,34 @@ const Layout: React.FC = () => {
                 <MessageSquare className="w-5 h-5 mr-2" />
                 Disparo WhatsApp
               </Link>
+            </li>
+            
+            {/* Menu CAMPANHAS EM LOTE com submenu */}
+            <li className="mt-2">
+              <button 
+                onClick={() => setCampanhasMenuOpen(!campanhasMenuOpen)}
+                className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-700 rounded text-left"
+              >
+                <div className="flex items-center">
+                  <FileSpreadsheet className="w-5 h-5 mr-2" />
+                  CAMPANHAS EM LOTE
+                </div>
+                {campanhasMenuOpen ? 
+                  <ChevronDown className="w-4 h-4" /> : 
+                  <ChevronRight className="w-4 h-4" />
+                }
+              </button>
+              
+              {campanhasMenuOpen && (
+                <ul className="pl-6 mt-1 space-y-1">
+                  <li>
+                    <Link to="/campanhas/consultas-lote" className="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+                      <ListChecks className="w-4 h-4 mr-2" />
+                      Consultas em Lote 2.0
+                    </Link>
+                  </li>
+                </ul>
+              )}
             </li>
             
             {/* Menu PROPOSTAS com submenu */}
