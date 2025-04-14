@@ -52,14 +52,15 @@ const CampaignControlSection: React.FC<CampaignControlSectionProps> = ({
               {batchStatus && <p className="text-sm text-gray-600">Status: {batchStatus}</p>}
             </div>
             <div className="flex items-center space-x-2">
-              {campaignStatus === 'idle' && (
+              {/* Removed "Iniciar" button */}
+              {/* {campaignStatus === 'idle' && (
                 <button
                   onClick={startCampaign}
                   className="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center"
                 >
                   <Play className="h-4 w-4 mr-1" /> Iniciar
                 </button>
-              )}
+              )} */}
               {campaignStatus === 'running' && (
                 <>
                   <button
@@ -102,8 +103,8 @@ const CampaignControlSection: React.FC<CampaignControlSectionProps> = ({
             </div>
           </div>
 
-          {/* Barra de progresso */}
-          {totalRecords > 0 && (
+          {/* Removed progress bar */}
+          {/* {totalRecords > 0 && (
             <div className="mb-4">
               <div className="w-full bg-gray-200 rounded-full h-4">
                 <div
@@ -115,11 +116,11 @@ const CampaignControlSection: React.FC<CampaignControlSectionProps> = ({
                 Progresso: {processedCount} / {totalRecords} ({processingProgress}%)
               </p>
             </div>
-          )}
+          )} */}
 
           {/* Estatísticas */}
           {stats.total > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
               <div className="bg-gray-50 p-4 rounded-lg">
                 <div className="text-sm text-gray-500">Total</div>
                 <div className="text-xl font-bold">{stats.total}</div>
@@ -140,10 +141,11 @@ const CampaignControlSection: React.FC<CampaignControlSectionProps> = ({
                 <div className="text-sm text-gray-500">Pendente</div>
                 <div className="text-xl font-bold text-blue-600">{stats.pendente}</div>
               </div>
-              <div className="bg-purple-50 p-4 rounded-lg">
+              {/* Removed "Em Processo" statistic */}
+              {/* <div className="bg-purple-50 p-4 rounded-lg">
                 <div className="text-sm text-gray-500">Em Processo</div>
                 <div className="text-xl font-bold text-purple-600">{stats.processamento}</div>
-              </div>
+              </div> */}
             </div>
           )}
 

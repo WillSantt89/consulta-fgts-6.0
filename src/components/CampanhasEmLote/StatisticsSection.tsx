@@ -15,7 +15,7 @@ const StatisticsSection: React.FC<StatisticsSectionProps> = ({ estatisticas }) =
   return (
     <>
       {estatisticas.total > 0 && (
-        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-5 gap-4 mb-6">
           <div className="bg-gray-50 p-4 rounded-lg">
             <div className="text-sm text-gray-500">Total</div>
             <div className="text-xl font-bold">{estatisticas.total}</div>
@@ -36,10 +36,11 @@ const StatisticsSection: React.FC<StatisticsSectionProps> = ({ estatisticas }) =
             <div className="text-sm text-gray-500">Pendente</div>
             <div className="text-xl font-bold text-blue-600">{estatisticas.pendente}</div>
           </div>
-          <div className="bg-purple-50 p-4 rounded-lg">
+          {/* Removed "Em Processo" statistic */}
+          {/* <div className="bg-purple-50 p-4 rounded-lg">
             <div className="text-sm text-gray-500">Em Processo</div>
             <div className="text-xl font-bold text-purple-600">{estatisticas.processamento}</div>
-          </div>
+          </div> */}
         </div>
       )}
     </>

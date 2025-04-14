@@ -1,5 +1,5 @@
 import React from 'react';
-import { Upload, FileText, AlertCircle, CheckCircle, XCircle } from 'lucide-react';
+import { Upload, FileText, AlertCircle, CheckCircle, XCircle, RefreshCw } from 'lucide-react';
 
 interface FileUploadSectionProps {
   file: File | null;
