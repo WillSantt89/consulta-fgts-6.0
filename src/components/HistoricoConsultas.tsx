@@ -72,6 +72,7 @@ const HistoricoConsultas: React.FC = () => {
       }
       
       const data = await response.json();
+      console.log("Dados recebidos da API:", data);
       setConsultas(data);
       setFilteredConsultas(data);
       calculateStatistics(data);
@@ -113,7 +114,7 @@ const HistoricoConsultas: React.FC = () => {
     if (searchTerm) {
       const term = searchTerm.toLowerCase();
       filtered = filtered.filter(c => 
-        c.cpf.toLowerCase().includes(term) || 
+        (c.cpf && c.cpf.toLowerCase().includes(term)) || 
         (c.nome && c.nome.toLowerCase().includes(term))
       );
     }
@@ -131,14 +132,43 @@ const HistoricoConsultas: React.FC = () => {
     // Filtrar por intervalo de datas
     if (dateRange.start) {
       const startDate = new Date(dateRange.start);
-      filtered = filtered.filter(c => new Date(c.created_at) >= startDate);
+      // Resetar para o início do dia
+      startDate.setHours(0, 0, 0, 0);
+      
+      filtered = filtered.filter(c => {
+        try {
+          const consultaDate = new Date(c.created_at);
+          return consultaDate >= startDate;
+        } catch (e) {
+          console.error("Erro ao converter data:", c.created_at, e);
+          return false;
+        }
+      });
     }
     
     if (dateRange.end) {
       const endDate = new Date(dateRange.end);
-      endDate.setHours(23, 59, 59, 999); // Configura para o final do dia
-      filtered = filtered.filter(c => new Date(c.created_at) <= endDate);
+      // Configurar para o final do dia
+      endDate.setHours(23, 59, 59, 999);
+      
+      filtered = filtered.filter(c => {
+        try {
+          const consultaDate = new Date(c.created_at);
+          return consultaDate <= endDate;
+        } catch (e) {
+          console.error("Erro ao converter data:", c.created_at, e);
+          return false;
+        }
+      });
     }
+    
+    console.log("Filtros aplicados:", {
+      searchTerm,
+      statusFilter,
+      bancoFilter,
+      dateRange,
+      resultCount: filtered.length
+    });
     
     setFilteredConsultas(filtered);
     calculateStatistics(filtered);
@@ -147,7 +177,7 @@ const HistoricoConsultas: React.FC = () => {
   // Efeito para aplicar filtros quando os valores mudam
   useEffect(() => {
     applyFilters();
-  }, [searchTerm, statusFilter, bancoFilter, dateRange]);
+  }, [searchTerm, statusFilter, bancoFilter, dateRange, consultas]);
 
   // Função para resetar filtros
   const resetFilters = () => {
@@ -186,8 +216,12 @@ const HistoricoConsultas: React.FC = () => {
   const formatDate = (dateString: string): string => {
     if (!dateString) return '';
     
-    const date = new Date(dateString);
-    return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR');
+    try {
+      const date = new Date(dateString);
+      return date.toLocaleDateString('pt-BR') + ' ' + date.toLocaleTimeString('pt-BR');
+    } catch (e) {
+      return dateString;
+    }
   };
 
   // Exportar para CSV
@@ -557,19 +591,7 @@ const HistoricoConsultas: React.FC = () => {
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className="text-sm text-gray-700">
-                  Mostrando
-                  <span className="font-medium">
-                    {startIndex + 1}
-                  </span>
-                  a
-                  <span className="font-medium">
-                    {Math.min(endIndex, filteredConsultas.length)}
-                  </span>
-                  de
-                  <span className="font-medium">
-                    {filteredConsultas.length}
-                  </span>
-                  resultados
+                  Mostrando <span className="font-medium">{Math.min(filteredConsultas.length, 1 + startIndex)}</span> a <span className="font-medium">{Math.min(endIndex, filteredConsultas.length)}</span> de <span className="font-medium">{filteredConsultas.length}</span> resultados
                 </p>
               </div>
               <div>
