@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Upload, RefreshCw, FileText, AlertCircle, CheckCircle, XCircle, Download, Info, X, FileJson } from 'lucide-react';
 import Papa from 'papaparse';
 
@@ -35,6 +35,9 @@ const ConsultaLote: React.FC = () => {
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
   const [selectedLog, setSelectedLog] = useState<{cpf: string, response: any} | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const [batchId, setBatchId] = useState<string | null>(null); // State to hold the batch ID
+  const [batchStatus, setBatchStatus] = useState<string | null>(null); // State to hold the batch status
+  const [batchInvalidRecords, setBatchInvalidRecords] = useState<any[]>([]); // State to hold invalid records
 
   // Função para gerar um ID único
   const generateUniqueId = (index: number): string => {
@@ -158,270 +161,64 @@ const ConsultaLote: React.FC = () => {
     }
   };
 
-  // Função que faz a consulta real para um CPF
-  const consultarCpf = async (cpf: string, id: string): Promise<ProcessedResult> => {
-    try {
-      const cpfNumerico = cpf.replace(/[^\d]/g, '');
-
-      const response = await fetch('https://santanacred-n8n-chatwoot.igxlaz.easypanel.host/webhook/consulta', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({ cpf: cpfNumerico })
-      });
-
-      if (!response.ok) {
-        const logMessage = `Erro na consulta: ${response.status} - ${response.statusText}`;
-        return {
-          id: id,
-          cpf: cpf,
-          status: 'erro',
-          mensagem: `Erro ${response.status}: ${response.statusText}`,
-          log: logMessage,
-          apiResponse: null
-        };
-      }
-
-      const data = await response.json();
-      let logMessage = '';
-
-      // Processa a resposta
-      if (data.codigo === "SIM") {
-        logMessage = `Consulta OK: Saldo disponível - R$ ${data.valorliberado}`;
-        return {
-          id: id,
-          cpf: cpf,
-          nome: data.nome || '',
-          status: 'com_saldo',
-          valorLiberado: parseFloat(data.valorliberado || '0'),
-          banco: data.banco || '',
-          log: logMessage,
-          apiResponse: data
-        };
-      } else {
-        logMessage = `Consulta OK: Sem saldo disponível`;
-        return {
-          id: id,
-          cpf: cpf,
-          nome: data.nome || '',
-          status: 'sem_saldo',
-          valorLiberado: 0,
-          log: logMessage,
-          apiResponse: data
-        };
-      }
-    } catch (error) {
-      const logMessage = `Erro na consulta: ${error instanceof Error ? error.message : 'Erro desconhecido'}`;
-      return {
-        id: id,
-        cpf: cpf,
-        status: 'erro',
-        mensagem: error instanceof Error ? error.message : 'Erro desconhecido',
-        log: logMessage,
-        apiResponse: null
-      };
-    }
-  };
-
-  // Função para aguardar um determinado tempo
-  const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-  // Função para inserir a consulta na API
-  const inserirConsulta = async (data: any) => {
-    try {
-      const response = await fetch('https://n8n-queue-2-n8n-webhook.igxlaz.easypanel.host/webhook/inserindo-consulta', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(data),
-      });
-
-      if (!response.ok) {
-        console.error('Erro ao inserir consulta na API:', response.status, response.statusText);
-        // You might want to handle the error here, e.g., by setting an error state
-      } else {
-        // Optionally, handle the successful response here
-        console.log('Consulta inserida com sucesso na API');
-      }
-    } catch (error) {
-      console.error('Erro ao inserir consulta na API:', error);
-      // Handle network errors or other exceptions
-    }
-  };
-
   // Função para processar todos os CPFs em lote
   const processAllCpfs = async () => {
-    if (parsedData.length === 0) {
-      setError('Não há dados válidos para processar.');
+    // Instead of the old logic, call the new API
+    // await sendBatchToApi();
+  };
+
+  // Função para enviar os dados para a API
+  const sendDataToApi = async () => {
+    if (!parsedData || parsedData.length === 0) {
+      setError('Nenhum dado válido para enviar.');
       return;
     }
 
     setIsProcessing(true);
-    setProcessingProgress(0);
+    setError(null);
+    setResults(null);
+    setBatchId(null);
+    setBatchStatus(null);
+    setBatchInvalidRecords([]);
 
-    // Inicializa os resultados
-    const initialResults: ResultsSummary = {
-      total: parsedData.length,
-      comSaldo: 0,
-      semSaldo: 0,
-      erros: 0,
-      pendentes: parsedData.length,
-      detalhes: parsedData.map(row => ({
-        id: row.ID || generateUniqueId(parsedData.indexOf(row)),
+    const apiUrl = 'https://n8n-queue-2-n8n-webhook.mrt7ga.easypanel.host/webhook/inserindo-consulta-lot';
+    const fileName = file?.name || 'importacao.csv'; // Use o nome do arquivo ou um padrão
+
+    const requestBody = {
+      tipo: 'api',
+      arquivo_nome: fileName,
+      consultas: parsedData.map(row => ({
         cpf: row.CPF,
-        nome: row.CLIENTE_NOME || row.nome || row.Nome || '',
-        telefone: row.CLIENTE_CELULAR || row.telefone || row.Telefone || '',
-        status: 'pendente',
-      }))
+        nome: row.nome,
+        telefone: row.telefone,
+      })),
     };
 
-    setResults(initialResults);
+    try {
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(requestBody),
+      });
 
-    // Processamento sequencial com intervalo de 3 segundos entre cada consulta
-    let processedCount = 0;
-    let comSaldoCount = 0;
-    let semSaldoCount = 0;
-    let errosCount = 0;
+      const data = await response.json();
 
-    for (let i = 0; i < parsedData.length; i++) {
-      const row = parsedData[i];
-      const id = row.ID || generateUniqueId(i);
-      const batchId = 'seu_batch_id'; // Substitua com a lógica real para gerar o batch_id
-      const requestId = generateUniqueId(i); // Gere um request_id único para cada consulta
-      
-      try {
-        // Consulta o CPF atual
-        const result = await consultarCpf(row.CPF, id);
-        
-        // Monta o objeto para a API de inserção
-        const consultaData = {
-          batch_id: batchId,
-          request_id: requestId,
-          cpf: result.cpf,
-          nome: result.nome || '',
-          telefone: row.CLIENTE_CELULAR || row.telefone || row.Telefone || '',
-          status: result.status,
-          valor_liberado: result.valorLiberado || 0,
-          banco: result.banco || '',
-          mensagem: result.mensagem || '',
-          log: result.log || '',
-          api_response: result.apiResponse,
-        };
-
-        // Chama a API para inserir a consulta
-        await inserirConsulta(consultaData);
-        
-        // Atualiza os contadores
-        if (result.status === 'com_saldo') comSaldoCount++;
-        else if (result.status === 'sem_saldo') semSaldoCount++;
-        else if (result.status === 'erro') errosCount++;
-        
-        // Atualiza os resultados
-        setResults(prevResults => {
-          if (!prevResults) return null;
-          
-          const updatedDetails = [...prevResults.detalhes];
-          const index = updatedDetails.findIndex(d => d.id === id);
-          
-          if (index !== -1) {
-            updatedDetails[index] = result;
-          }
-          
-          return {
-            ...prevResults,
-            comSaldo: comSaldoCount,
-            semSaldo: semSaldoCount,
-            erros: errosCount,
-            pendentes: prevResults.total - (comSaldoCount + semSaldoCount + errosCount),
-            detalhes: updatedDetails
-          };
-        });
-        
-        // Atualiza o progresso
-        processedCount++;
-        setProcessingProgress(Math.round((processedCount / parsedData.length) * 100));
-        
-        // Aguarda 3 segundos antes da próxima consulta (exceto para o último item)
-        if (i < parsedData.length - 1) {
-          await delay(3000); // Pausa de 3 segundos entre cada consulta
-        }
-      } catch (error) {
-        console.error('Erro ao processar CPF:', row.CPF, error);
-        errosCount++;
-        
-        // Atualiza os resultados com o erro
-        setResults(prevResults => {
-          if (!prevResults) return null;
-          
-          const updatedDetails = [...prevResults.detalhes];
-          const index = updatedDetails.findIndex(d => d.id === id);
-          
-          if (index !== -1) {
-            updatedDetails[index] = {
-              id: id,
-              cpf: row.CPF,
-              status: 'erro',
-              mensagem: 'Erro ao processar a consulta',
-              log: `Erro: ${error instanceof Error ? error.message : 'Erro desconhecido'}`
-            };
-          }
-          
-          return {
-            ...prevResults,
-            comSaldo: comSaldoCount,
-            semSaldo: semSaldoCount,
-            erros: errosCount,
-            pendentes: prevResults.total - (comSaldoCount + semSaldoCount + errosCount),
-            detalhes: updatedDetails
-          };
-        });
-        
-        // Atualiza o progresso
-        processedCount++;
-        setProcessingProgress(Math.round((processedCount / parsedData.length) * 100));
-        
-        // Aguarda 3 segundos antes da próxima consulta (exceto para o último item)
-        if (i < parsedData.length - 1) {
-          await delay(3000);
-        }
+      if (response.ok) {
+        setResults(null); // Limpa resultados anteriores
+        setBatchId(data.batch.batch_id);
+        setBatchStatus(data.batch.status);
+        setBatchInvalidRecords(data.registros_invalidos || []);
+        setError(null); // Limpa erros anteriores
+      } else {
+        setError(data.message || 'Erro ao processar o lote.');
       }
+    } catch (error: any) {
+      setError(error.message || 'Erro ao conectar com a API.');
+    } finally {
+      setIsProcessing(false);
     }
-
-    // Após concluir o processamento, salva os clientes com saldo no localStorage para o disparo de WhatsApp
-    if (results) {
-      const clientesComSaldo = results.detalhes
-        .filter(item => item.status === 'com_saldo')
-        .map(item => ({
-          id: item.id,
-          cpf: item.cpf,
-          nome: item.nome || '',
-          telefone: item.telefone || '',
-          valorLiberado: item.valorLiberado || 0,
-          banco: item.banco || '',
-          status: 'pendente' as const,
-          dataConsulta: new Date().toISOString(),
-          apiResponse: item.apiResponse
-        }));
-
-      // Verifica se já existem clientes salvos e adiciona os novos
-      const clientesArmazenados = localStorage.getItem('clientesComSaldoFGTS');
-      let todosClientes = clientesComSaldo;
-      
-      if (clientesArmazenados) {
-        const clientesAnteriores = JSON.parse(clientesArmazenados);
-        // Combina os clientes antigos com os novos, evitando duplicatas por CPF
-        const cpfsNovos = new Set(clientesComSaldo.map(c => c.cpf));
-        const clientesFiltrados = clientesAnteriores.filter((c: any) => !cpfsNovos.has(c.cpf));
-        todosClientes = [...clientesFiltrados, ...clientesComSaldo];
-      }
-      
-      localStorage.setItem('clientesComSaldoFGTS', JSON.stringify(todosClientes));
-    }
-
-    setIsProcessing(false);
-    setProcessingProgress(100);
   };
 
   // Função para reiniciar o processo
@@ -434,6 +231,9 @@ const ConsultaLote: React.FC = () => {
     setIsUploading(false);
     setIsProcessing(false);
     setProcessingProgress(0);
+    setBatchId(null);
+    setBatchStatus(null);
+    setBatchInvalidRecords([]);
     if (fileInputRef.current) {
       fileInputRef.current.value = '';
     }
@@ -490,7 +290,7 @@ const ConsultaLote: React.FC = () => {
 
   // Renderiza o resultado do processamento
   const renderResults = () => {
-    if (!results) return null;
+    if (!results && !batchId) return null;
 
     return (
       <div className="bg-white rounded-lg shadow mt-6">
@@ -499,7 +299,7 @@ const ConsultaLote: React.FC = () => {
           <button
             onClick={downloadResults}
             className="flex items-center px-3 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 text-sm"
-            disabled={isProcessing || results.pendentes === results.total}
+            disabled={isProcessing || !batchId}
           >
             <Download className="h-4 w-4 mr-1" />
             Baixar Resultados
@@ -524,138 +324,27 @@ const ConsultaLote: React.FC = () => {
           )}
 
           {/* Resumo dos resultados */}
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-500">Total de CPFs</div>
-              <div className="text-2xl font-bold">{results.total}</div>
+          {batchId && (
+            <div className="mb-4">
+              <p>Batch ID: {batchId}</p>
+              <p>Status: {batchStatus || 'Processando...'}</p>
             </div>
-            <div className="bg-green-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-500">Com Saldo</div>
-              <div className="text-2xl font-bold text-green-600">
-                {results.comSaldo}
-                <span className="text-sm text-gray-500 font-normal ml-1">
-                  ({Math.round(results.comSaldo / results.total * 100) || 0}%)
-                </span>
-              </div>
-            </div>
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-500">Sem Saldo</div>
-              <div className="text-2xl font-bold text-gray-600">
-                {results.semSaldo}
-                <span className="text-sm text-gray-500 font-normal ml-1">
-                  ({Math.round(results.semSaldo / results.total * 100) || 0}%)
-                </span>
-              </div>
-            </div>
-            <div className="bg-red-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-500">Erros</div>
-              <div className="text-2xl font-bold text-red-600">
-                {results.erros}
-                <span className="text-sm text-gray-500 font-normal ml-1">
-                  ({Math.round(results.erros / results.total * 100) || 0}%)
-                </span>
-              </div>
-            </div>
-            <div className="bg-blue-50 p-4 rounded-lg">
-              <div className="text-sm text-gray-500">Pendentes</div>
-              <div className="text-2xl font-bold text-blue-600">
-                {results.pendentes}
-                <span className="text-sm text-gray-500 font-normal ml-1">
-                  ({Math.round(results.pendentes / results.total * 100) || 0}%)
-                </span>
-              </div>
-            </div>
-          </div>
+          )}
 
-          {/* Tabela de resultados */}
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    ID
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    CPF
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Nome
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Valor Liberado
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Banco
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Mensagem
-                  </th>
-                  <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {results.detalhes.map((item, index) => (
-                  <tr key={index} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {item.id}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {item.cpf}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {item.nome || '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {item.status === 'com_saldo' && (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          <CheckCircle className="h-4 w-4 mr-1" />
-                          Com Saldo
-                        </span>
-                      )}
-                      {item.status === 'sem_saldo' && (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-gray-100 text-gray-800">
-                          <XCircle className="h-4 w-4 mr-1" />
-                          Sem Saldo
-                        </span>
-                      )}
-                      {item.status === 'erro' && (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                          <AlertCircle className="h-4 w-4 mr-1" />
-                          Erro
-                        </span>
-                      )}
-                      {item.status === 'pendente' && (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-blue-100 text-blue-800">
-                          <RefreshCw className="h-4 w-4 mr-1 animate-spin" />
-                          Pendente
-                        </span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {item.valorLiberado ? `R$ ${item.valorLiberado.toFixed(2)}` : '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {item.banco || '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {item.mensagem || '-'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
-                      {item.apiResponse && (
-                        <button 
-                          onClick={() => setSelectedLog({cpf: item.cpf, response: item.apiResponse})}
-                          className="px-2 py-1 text-xs text-white bg-blue-500 rounded hover:bg-blue-600"
-                        >
-                          Ver Log
-                        </button>
-                      )}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+          {batchInvalidRecords.length > 0 && (
+            <div className="mt-4">
+              <div className="p-3 bg-red-50 text-red-700 rounded-md">
+                <h3 className="text-sm font-medium">Registros Inválidos:</h3>
+                <ul className="list-disc pl-5 text-xs space-y-1">
+                  {batchInvalidRecords.map((record, index) => (
+                    <li key={index}>
+                      CPF: {record.cpf}, Nome: {record.nome}, Erro: {record.erro}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -669,8 +358,7 @@ const ConsultaLote: React.FC = () => {
         </h2>
 
         <div className="mb-6">
-          <p className="text-gray```typescript
-          600 mb-4">
+          <p className="text-gray-600 mb-4">
             Faça o upload de um arquivo CSV contendo uma lista de CPFs para consulta em lote.
             O arquivo deve conter uma coluna com o título "CPF" contendo os números de CPF a serem consultados.
           </p>
@@ -750,7 +438,7 @@ const ConsultaLote: React.FC = () => {
             </div>
           )}
 
-          {parsedData.length > 0 && (
+          {parsedData.length > 0 && !isUploading && (
             <div className="mt-4">
               <div className="p-3 bg-green-50 text-green-700 rounded-md flex items-center">
                 <CheckCircle className="h-5 w-5 mr-2" />
@@ -762,6 +450,18 @@ const ConsultaLote: React.FC = () => {
           )}
         </div>
 
+        {parsedData.length > 0 && !isUploading && (
+          <div className="flex justify-end">
+            <button
+              type="button"
+              onClick={sendDataToApi}
+              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+            >
+              Confirmar Importação
+            </button>
+          </div>
+        )}
+
         <div className="flex space-x-3">
           <button
             type="button"
@@ -770,35 +470,10 @@ const ConsultaLote: React.FC = () => {
           >
             Cancelar
           </button>
-
-          <button
-            type="button"
-            onClick={processAllCpfs}
-            disabled={parsedData.length === 0 || isUploading || isProcessing}
-            className={`flex-1 flex items-center justify-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white ${
-              parsedData.length === 0 || isUploading || isProcessing
-                ? 'bg-gray-400 cursor-not-allowed'
-                : 'bg-green-600 hover:bg-green-700'
-            }`}
-          >
-            {isUploading ? (
-              <>
-                <RefreshCw className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                Enviando arquivo...
-              </>
-            ) : isProcessing ? (
-              <>
-                <RefreshCw className="animate-spin -ml-1 mr-2 h-4 w-4" />
-                Processando consultas...
-              </>
-            ) : (
-              'Iniciar Consulta em Lote'
-            )}
-          </button>
         </div>
       </div>
 
-      {results && renderResults()}
+      {renderResults()}
 
       
       {selectedLog && (
