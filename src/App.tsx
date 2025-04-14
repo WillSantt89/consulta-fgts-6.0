@@ -10,6 +10,7 @@ import VctexEmLote from './components/VctexEmLote';
 import VctexProtocolos from './components/VctexProtocolos';
 import DigitarProposta from './components/DigitarProposta';
 import AcompanhamentoPropostas from './components/AcompanhamentoPropostas';
+import FactaApiConfig from './components/FactaApiConfig';
 
 const App: React.FC = () => {
   return (
@@ -24,9 +25,12 @@ const App: React.FC = () => {
           <Route path="vctex-protocolos" element={<VctexProtocolos />} />
           <Route path="clientes/buscar" element={<BuscarClientes />} />
           
-          {/* Novas rotas para Propostas */}
+          {/* Rotas para Propostas */}
           <Route path="propostas/digitar" element={<DigitarProposta />} />
           <Route path="propostas/acompanhamento" element={<AcompanhamentoPropostas />} />
+          
+          {/* Rotas para Configurações API */}
+          <Route path="configuracoes/facta/cadastro" element={<FactaApiConfig />} />
           
           {/* Add more routes for other features here */}
         </Route>

@@ -13,12 +13,17 @@ import {
   Search, 
   Server,
   FileText,
-  ClipboardList
+  ClipboardList,
+  Settings,
+  KeyRound,
+  Building
 } from 'lucide-react';
 
 const Layout: React.FC = () => {
   const [clientesMenuOpen, setClientesMenuOpen] = useState(false);
   const [propostasMenuOpen, setPropostasMenuOpen] = useState(false);
+  const [configMenuOpen, setConfigMenuOpen] = useState(false);
+  const [factaMenuOpen, setFactaMenuOpen] = useState(false);
 
   return (
     <div className="flex min-h-screen">
@@ -27,7 +32,7 @@ const Layout: React.FC = () => {
         <div className="p-4">
           <h1 className="text-2xl font-bold">Sistema FGTS</h1>
         </div>
-        <nav className="flex-1 px-2 py-4">
+        <nav className="flex-1 px-2 py-4 overflow-y-auto">
           <ul className="space-y-1">
             <li>
               <Link to="/" className="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
@@ -106,6 +111,54 @@ const Layout: React.FC = () => {
               )}
             </li>
             
+            {/* Menu Configurações API com submenu */}
+            <li className="mt-2">
+              <button 
+                onClick={() => setConfigMenuOpen(!configMenuOpen)}
+                className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-700 rounded text-left"
+              >
+                <div className="flex items-center">
+                  <Settings className="w-5 h-5 mr-2" />
+                  Configurações API
+                </div>
+                {configMenuOpen ? 
+                  <ChevronDown className="w-4 h-4" /> : 
+                  <ChevronRight className="w-4 h-4" />
+                }
+              </button>
+              
+              {configMenuOpen && (
+                <ul className="pl-6 mt-1 space-y-1">
+                  <li>
+                    <button
+                      onClick={() => setFactaMenuOpen(!factaMenuOpen)}
+                      className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-700 rounded text-left"
+                    >
+                      <div className="flex items-center">
+                        <Building className="w-4 h-4 mr-2" />
+                        Banco Facta
+                      </div>
+                      {factaMenuOpen ? 
+                        <ChevronDown className="w-4 h-4" /> : 
+                        <ChevronRight className="w-4 h-4" />
+                      }
+                    </button>
+                    
+                    {factaMenuOpen && (
+                      <ul className="pl-6 mt-1 space-y-1">
+                        <li>
+                          <Link to="/configuracoes/facta/cadastro" className="flex items-center px-4 py-2 hover:bg-gray-700 rounded">
+                            <KeyRound className="w-4 h-4 mr-2" />
+                            Cadastro de API Facta
+                          </Link>
+                        </li>
+                      </ul>
+                    )}
+                  </li>
+                </ul>
+              )}
+            </li>
+            
             {/* Menu Clientes Nova Vida com submenu */}
             <li className="mt-2">
               <button 
@@ -144,7 +197,7 @@ const Layout: React.FC = () => {
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 bg-gray-50">
+      <main className="flex-1 p-6 bg-gray-50 overflow-y-auto">
         <Outlet />
       </main>
     </div>
