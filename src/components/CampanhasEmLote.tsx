@@ -1,39 +1,14 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Upload, RefreshCw, FileText, AlertCircle, CheckCircle, XCircle, Download, Info, X, FileJson, Play, Pause, Trash2, Search } from 'lucide-react';
 import Papa from 'papaparse';
-
-interface ProcessedResult {
-  id: string;
-  cpf: string;
-  nome?: string;
-  telefone?: string;
-  status: 'com_saldo' | 'sem_saldo' | 'erro' | 'pendente' | 'processing' | 'paused';
-  valorLiberado?: number;
-  banco?: string;
-  mensagem?: string;
-  log?: string;
-  apiResponse?: any;
-}
-
-interface ResultsSummary {
-  total: number;
-  comSaldo: number;
-  semSaldo: number;
-  erros: number;
-  pendentes: number;
-  detalhes: ProcessedResult[];
-}
-
-interface BatchItem {
-  id: number;
-  batch_id: string;
-  type_consultation: string;
-  created_at: string;
-  file_name: string;
-  total_records: number;
-  processed_records: number;
-  status: string;
-}
+import { BatchItem, ProcessedResult, ResultsSummary, FiltrosState } from '../types';
+import { formatarCPF, formatarTelefone, formatarData } from '../utils';
+import FileUploadSection from './CampanhasEmLote/FileUploadSection';
+import CampaignControlSection from './CampanhasEmLote/CampaignControlSection';
+import StatisticsSection from './CampanhasEmLote/StatisticsSection';
+import BatchHistoryTable from './CampanhasEmLote/BatchHistoryTable';
+import FilterSection from './CampanhasEmLote/FilterSection';
+import { useApiData } from '../hooks/useApiData';
 
 const ConsultasLote2: React.FC = () => {
   const [file, setFile] = useState<File | null>(null);
@@ -56,14 +31,26 @@ const ConsultasLote2: React.FC = () => {
   const [intervalId, setIntervalId] = useState<NodeJS.Timeout | null>(null);
   const [apiEndpoint, setApiEndpoint] = useState<string>('https://santanacred-n8n-chatwoot.igxlaz.easypanel.host/webhook/consulta');
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
-
-  // State for API data
-  const [apiData, setApiData] = useState<BatchItem[]>([]);
-  const [apiDataLoading, setApiDataLoading] = useState<boolean>(true);
-  const [apiDataError, setApiDataError] = useState<string | null>(null);
-
-  // State for search
   const [searchQuery, setSearchQuery] = useState<string>('');
+  const [apiEndpointSelected, setApiEndpointSelected] = useState<string>('https://santanacred-n8n-chatwoot.igxlaz.easypanel.host/webhook/consulta');
+
+  const { apiData, apiDataLoading, apiDataError, fetchApiData } = useApiData('https://n8n-queue-2-n8n-webhook.mrt7ga.easypanel.host/webhook/inserindo-consulta-lot');
+
+  const [filtros, setFiltros] = useState<FiltrosState>({
+    status: 'todos',
+    banco: '',
+    valorMinimo: 0,
+    busca: ''
+  });
+  const [mostrarFiltros, setMostrarFiltros] = useState(false);
+  const [bancosDisponiveis, setBancosDisponiveis] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (campaignResults.length > 0) {
+      const bancos = [...new Set(campaignResults.map(c => c.banco || '').filter(b => b))];
+      setBancosDisponiveis(bancos);
+    }
+  }, [campaignResults]);
 
   const generateUniqueId = (index: number): string => {
     const timestamp = new Date().getTime();
@@ -106,12 +93,6 @@ const ConsultasLote2: React.FC = () => {
     }
 
     return true;
-  };
-
-  const formatarCPF = (cpf: string): string => {
-    const cpfNumerico = cpf.replace(/\D/g, '');
-    const cpfPreenchido = cpfNumerico.padStart(11, '0');
-    return cpfPreenchido;
   };
 
   const parseFile = (file: File) => {
@@ -193,10 +174,10 @@ const ConsultasLote2: React.FC = () => {
     setBatchInvalidRecords([]);
     setCampaignStatus('running');
     setProcessedCount(0);
-    setCampaignResults(parsedData.map(item => ({ 
-      ...item, 
+    setCampaignResults(parsedData.map(item => ({
+      ...item,
       status: 'pendente',
-      cpf: item.CPF // Garantir que estamos usando o campo CPF
+      cpf: item.CPF
     })));
 
     const apiUrl = 'https://n8n-queue-2-n8n-webhook.mrt7ga.easypanel.host/webhook/inserindo-consulta-lot';
@@ -234,7 +215,6 @@ const ConsultasLote2: React.FC = () => {
         setError(null);
         setSuccessMessage('Lote enviado com sucesso! Iniciando processamento...');
         startCampaign();
-        // Refresh the API data after successful import
         fetchApiData();
       } else {
         setError(data.message || 'Erro ao processar o lote.');
@@ -254,7 +234,7 @@ const ConsultasLote2: React.FC = () => {
       if (intervalId) {
         clearInterval(intervalId);
       }
-      const id = setInterval(processNextRecord, 500); // Ajuste o intervalo conforme necessário
+      const id = setInterval(processNextRecord, 500);
       setIntervalId(id);
       setSuccessMessage('Processamento iniciado. Consultando CPFs...');
     }
@@ -293,7 +273,6 @@ const ConsultasLote2: React.FC = () => {
     );
 
     if (nextIndex === -1) {
-      // Campanha finalizada
       stopCampaign();
       setSuccessMessage('Processamento concluído! Todos os CPFs foram consultados.');
       return;
@@ -302,7 +281,6 @@ const ConsultasLote2: React.FC = () => {
     const record = campaignResults[nextIndex];
     if (!record) return;
 
-    // Atualizar o status para processing
     setCampaignResults((prevResults) => {
       const newResults = [...prevResults];
       newResults[nextIndex] = {
@@ -313,7 +291,7 @@ const ConsultasLote2: React.FC = () => {
     });
 
     try {
-      const response = await fetch(apiEndpoint, {
+      const response = await fetch(apiEndpointSelected, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -327,7 +305,6 @@ const ConsultasLote2: React.FC = () => {
 
       const data = await response.json();
 
-      // Verifica se tem saldo baseado na resposta da API
       let newStatus: ProcessedResult['status'] = 'erro';
       if (data.codigo === 'SIM') {
         newStatus = 'com_saldo';
@@ -370,16 +347,14 @@ const ConsultasLote2: React.FC = () => {
 
     const csvHeaders = ['ID', 'CPF', 'Nome', 'Telefone', 'Status', 'Valor Liberado', 'Banco', 'Mensagem', 'Log'];
     const csvRows = campaignResults.map(result => {
-      // Extrair os campos necessários
       const { ID, cpf, nome, telefone, status, valorLiberado, banco, mensagem, log } = result;
-      
-      // Formatar o status para exibição
-      const statusFormatado = 
-        status === 'com_saldo' ? 'Com Saldo' : 
-        status === 'sem_saldo' ? 'Sem Saldo' : 
-        status === 'erro' ? 'Erro' : 
-        status === 'pendente' ? 'Pendente' : 
-        status === 'processing' ? 'Processando' : 'Pausado';
+
+      const statusFormatado =
+        status === 'com_saldo' ? 'Com Saldo' :
+          status === 'sem_saldo' ? 'Sem Saldo' :
+            status === 'erro' ? 'Erro' :
+              status === 'pendente' ? 'Pendente' :
+                status === 'processing' ? 'Processando' : 'Pausado';
 
       return [
         ID || '',
@@ -436,7 +411,6 @@ const ConsultasLote2: React.FC = () => {
     }
   };
 
-  // Calcular estatísticas dos resultados
   const calculateStatistics = () => {
     if (!campaignResults || campaignResults.length === 0) {
       return {
@@ -461,7 +435,6 @@ const ConsultasLote2: React.FC = () => {
 
   const stats = calculateStatistics();
 
-  // Calcular o progresso do processamento
   useEffect(() => {
     if (totalRecords > 0) {
       const progress = Math.round((processedCount / totalRecords) * 100);
@@ -469,57 +442,77 @@ const ConsultasLote2: React.FC = () => {
     }
   }, [processedCount, totalRecords]);
 
-  // Fetch API data
-  const fetchApiData = async () => {
-    setApiDataLoading(true);
-    setApiDataError(null);
+  const handleStartConsultation = async (batchId: string) => {
+    // Implement the start consultation logic here
+    console.log(`Starting consultation for batch with ID: ${batchId}`);
     try {
-      const response = await fetch('https://n8n-queue-2-n8n-webhook.mrt7ga.easypanel.host/webhook/inserindo-consulta-lot');
-      if (!response.ok) {
-        throw new Error(`Failed to fetch API data: ${response.status} ${response.statusText}`);
-      }
-      const data: BatchItem[] = await response.json();
-      setApiData(data);
-    } catch (error: any) {
-      setApiDataError(error.message);
-    } finally {
-      setApiDataLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    fetchApiData();
-  }, []);
-
-  // Function to delete a batch item
-  const handleDeleteBatch = async (batchId: string) => {
-    // Implement the delete logic here
-    console.log(`Deleting batch with ID: ${batchId}`);
-    // Example API call (replace with your actual API endpoint)
-    try {
-      const response = await fetch(`https://n8n-queue-2-n8n-webhook.mrt7ga.easypanel.host/webhook/inserindo-consulta-lot/${batchId}`, {
-        method: 'DELETE',
+      const response = await fetch('https://n8n-queue-2-n8n-webhook.mrt7ga.easypanel.host/webhook/iniciando-consulta-lot', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ batchId }),
       });
 
       if (!response.ok) {
-        throw new Error(`Failed to delete batch: ${response.status} ${response.statusText}`);
+        throw new Error(`Failed to start consultation: ${response.status} ${response.statusText}`);
       }
-      // Refresh the API data after successful deletion
-      fetchApiData();
+
+      const data = await response.json();
+      console.log('Consulta iniciada com sucesso:', data);
+      // Optionally, update the UI to reflect the starting process
     } catch (error: any) {
-      console.error('Error deleting batch:', error);
-      setError(error.message || 'Failed to delete batch.');
+      console.error('Error starting consultation:', error);
+      setError(error.message || 'Failed to start consultation.');
     }
   };
 
-  // Function to start consultation for a batch item
-  const handleStartConsultation = (batchId: string) => {
-    // Implement the start consultation logic here
-    console.log(`Starting consultation for batch with ID: ${batchId}`);
-    // You can add your API call or logic to start the consultation here
+  const handleFilterChange = (newFiltros: Partial<FiltrosState>) => {
+    setFiltros(prevFiltros => ({
+      ...prevFiltros,
+      ...newFiltros
+    }));
   };
 
-  // Filtered API data based on search query
+  const aplicarFiltros = () => {
+    let clientesFiltrados = [...campaignResults];
+
+    if (filtros.status !== 'todos') {
+      clientesFiltrados = clientesFiltrados.filter(c => c.status === filtros.status);
+    }
+
+    if (filtros.banco) {
+      clientesFiltrados = clientesFiltrados.filter(c => c.banco === filtros.banco);
+    }
+
+    if (filtros.valorMinimo > 0) {
+      clientesFiltrados = clientesFiltrados.filter(c => c.valorLiberado >= filtros.valorMinimo);
+    }
+
+    if (filtros.busca) {
+      const termoBusca = filtros.busca.toLowerCase();
+      clientesFiltrados = clientesFiltrados.filter(c =>
+        c.cpf.includes(termoBusca) ||
+        (c.nome && c.nome.toLowerCase().includes(termoBusca))
+      );
+    }
+
+    setCampaignResults(clientesFiltrados);
+  };
+
+  useEffect(() => {
+    aplicarFiltros();
+  }, [filtros, campaignResults]);
+
+  const limparFiltros = () => {
+    setFiltros({
+      status: 'todos',
+      banco: '',
+      valorMinimo: 0,
+      busca: ''
+    });
+  };
+
   const filteredApiData = apiData.filter(item =>
     item.file_name.toLowerCase().includes(searchQuery.toLowerCase()) ||
     item.batch_id.toLowerCase().includes(searchQuery.toLowerCase())
@@ -529,363 +522,84 @@ const ConsultasLote2: React.FC = () => {
     <div className="p-6">
       <h2 className="text-2xl font-bold text-gray-800 mb-4">Consultas em Lote 2.0</h2>
 
-      <div className="bg-white rounded-lg shadow p-6 mb-6">
-        <h3 className="text-lg font-medium text-gray-700 mb-4">Importar Arquivo CSV</h3>
+      <FileUploadSection
+        file={file}
+        isUploading={isUploading}
+        handleFileChange={handleFileChange}
+        error={error}
+        validationErrors={validationErrors}
+        handleReset={handleReset}
+        fileInputRef={fileInputRef}
+      />
 
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 text-center">
-          <input
-            type="file"
-            ref={fileInputRef}
-            id="file-upload"
-            onChange={handleFileChange}
-            className="hidden"
-            accept=".csv,.xlsx,.xls"
-          />
-          <div className="flex flex-col items-center justify-center">
-            <Upload className="h-12 w-12 text-gray-400 mb-3" />
-            <p className="text-sm text-gray-600 mb-2">
-              Arraste e solte seu arquivo aqui, ou
-            </p>
-            <label
-              htmlFor="file-upload"
-              className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 cursor-pointer"
+      {parsedData.length > 0 && !isUploading && (
+        <div className="flex justify-between items-center mt-4">
+          <div className="flex space-x-2">
+            <select
+              value={apiEndpointSelected}
+              onChange={(e) => setApiEndpointSelected(e.target.value)}
+              className="px-3 py-2 border border-gray-300 rounded-md text-sm"
             >
-              Selecionar Arquivo
-            </label>
-            <p className="text-xs text-gray-500 mt-2">
-              Formatos suportados: CSV - Máx. 5MB
-            </p>
+              <option value="https://santanacred-n8n-chatwoot.igxlaz.easypanel.host/webhook/consulta">API Padrão</option>
+              <option value="https://santanacred-n8n-chatwoot.igxlaz.easypanel.host/webhook/vctex/consulta">API VCTEX</option>
+              <option value="https://n8n-queue-2-n8n-webhook.igxlaz.easypanel.host/webhook/simulador/facta">API Facta</option>
+            </select>
           </div>
-        </div>
-
-        {file && (
-          <div className="mt-4 p-3 bg-gray-50 rounded-md flex items-center justify-between">
-            <div className="flex items-center">
-              <FileText className="h-5 w-5 text-gray-500 mr-2" />
-              <div>
-                <p className="text-sm font-medium text-gray-700">{file.name}</p>
-                <p className="text-xs text-gray-500">
-                  {(file.size / 1024).toFixed(2)} KB
-                </p>
-              </div>
-            </div>
-            <button
-              onClick={handleReset}
-              className="text-gray-500 hover:text-gray-700"
-            >
-              <XCircle className="h-5 w-5" />
-            </button>
-          </div>
-        )}
-
-        {error && (
-          <div className="mt-4 p-3 bg-red-50 text-red-700 rounded-md flex items-center">
-            <AlertCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-            <p className="text-sm">{error}</p>
-          </div>
-        )}
-
-        {successMessage && (
-          <div className="mt-4 p-3 bg-green-50 text-green-700 rounded-md flex items-center">
-            <CheckCircle className="h-5 w-5 mr-2 flex-shrink-0" />
-            <p className="text-sm">{successMessage}</p>
-          </div>
-        )}
-
-        {validationErrors.length > 0 && (
-          <div className="mt-4">
-            <div className="p-3 bg-yellow-50 text-yellow-700 rounded-md flex items-start">
-              <Info className="h-5 w-5 mr-2 flex-shrink-0 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium">Foram encontrados alguns problemas no arquivo:</p>
-                <div className="mt-2 max-h-32 overflow-y-auto">
-                  <ul className="list-disc pl-5 text-xs space-y-1">
-                    {validationErrors.slice(0, 10).map((err, idx) => (
-                      <li key={idx}>{err}</li>
-                    ))}
-                    {validationErrors.length > 10 && (
-                      <li>...e mais {validationErrors.length - 10} problemas.</li>
-                    )}
-                  </ul>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {parsedData.length > 0 && !isUploading && (
-          <div className="mt-4">
-            <div className="p-3 bg-green-50 text-green-700 rounded-md flex items-center">
-              <CheckCircle className="h-5 w-5 mr-2" />
-              <p className="text-sm">
-                {parsedData.length} CPFs válidos encontrados no arquivo.
-              </p>
-            </div>
-          </div>
-        )}
-
-        {parsedData.length > 0 && !isUploading && (
-          <div className="flex justify-between items-center mt-4">
-            <div className="flex space-x-2">
-              <select
-                value={apiEndpoint}
-                onChange={(e) => setApiEndpoint(e.target.value)}
-                className="px-3 py-2 border border-gray-300 rounded-md text-sm"
-              >
-                <option value="https://santanacred-n8n-chatwoot.igxlaz.easypanel.host/webhook/consulta">API Padrão</option>
-                <option value="https://santanacred-n8n-chatwoot.igxlaz.easypanel.host/webhook/vctex/consulta">API VCTEX</option>
-                <option value="https://n8n-queue-2-n8n-webhook.igxlaz.easypanel.host/webhook/simulador/facta">API Facta</option>
-              </select>
-            </div>
-            <button
-              onClick={sendDataToApi}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
-            >
-              Confirmar Importação e Iniciar
-            </button>
-          </div>
-        )}
-      </div>
-
-      {/* Campaign Control and Results */}
-      {(batchId || campaignResults.length > 0) && (
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h3 className="text-lg font-medium text-gray-700 mb-4">Gerenciamento da Campanha</h3>
-
-          <div className="flex items-center justify-between mb-4">
-            <div>
-              {batchId && <p className="text-sm text-gray-600">Batch ID: {batchId}</p>}
-              {batchStatus && <p className="text-sm text-gray-600">Status: {batchStatus}</p>}
-            </div>
-            <div className="flex items-center space-x-2">
-              {campaignStatus === 'idle' && (
-                <button
-                  onClick={startCampaign}
-                  className="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center"
-                >
-                  <Play className="h-4 w-4 mr-1" /> Iniciar
-                </button>
-              )}
-              {campaignStatus === 'running' && (
-                <>
-                  <button
-                    onClick={pauseCampaign}
-                    className="px-3 py-2 bg-yellow-500 text-white rounded-md hover:bg-yellow-600 flex items-center"
-                  >
-                    <Pause className="h-4 w-4 mr-1" /> Pausar
-                  </button>
-                </>
-              )}
-              {campaignStatus === 'paused' && (
-                <>
-                  <button
-                    onClick={resumeCampaign}
-                    className="px-3 py-2 bg-green-500 text-white rounded-md hover:bg-green-600 flex items-center"
-                  >
-                    <Play className="h-4 w-4 mr-1" /> Retomar
-                  </button>
-                </>
-              )}
-              {(campaignStatus === 'running' || campaignStatus === 'paused') && (
-                <button
-                  onClick={stopCampaign}
-                  className="px-3 py-2 bg-red-500 text-white rounded-md hover:bg-red-600 flex items-center"
-                >
-                  <X className="h-4 w-4 mr-1" /> Parar
-                </button>
-              )}
-              <button
-                onClick={downloadResults}
-                disabled={campaignResults.length === 0}
-                className={`px-3 py-2 ${
-                  campaignResults.length === 0 
-                    ? 'bg-gray-300 text-gray-500 cursor-not-allowed' 
-                    : 'bg-blue-500 text-white hover:bg-blue-600'
-                } rounded-md flex items-center`}
-              >
-                <Download className="h-4 w-4 mr-1" /> Exportar
-              </button>
-            </div>
-          </div>
-
-          {/* Barra de progresso */}
-          {totalRecords > 0 && (
-            <div className="mb-4">
-              <div className="w-full bg-gray-200 rounded-full h-4">
-                <div
-                  className="bg-green-600 h-4 rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${processingProgress}%` }}
-                ></div>
-              </div>
-              <p className="text-sm text-gray-600 mt-2 text-center">
-                Progresso: {processedCount} / {totalRecords} ({processingProgress}%)
-              </p>
-            </div>
-          )}
-
-          {/* Estatísticas */}
-          {campaignResults.length > 0 && (
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4 mb-6">
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <div className="text-sm text-gray-500">Total</div>
-                <div className="text-xl font-bold">{stats.total}</div>
-              </div>
-              <div className="bg-green-50 p-4 rounded-lg">
-                <div className="text-sm text-gray-500">Com Saldo</div>
-                <div className="text-xl font-bold text-green-600">{stats.comSaldo}</div>
-              </div>
-              <div className="bg-red-50 p-4 rounded-lg">
-                <div className="text-sm text-gray-500">Sem Saldo</div>
-                <div className="text-xl font-bold text-red-600">{stats.semSaldo}</div>
-              </div>
-              <div className="bg-yellow-50 p-4 rounded-lg">
-                <div className="text-sm text-gray-500">Erro</div>
-                <div className="text-xl font-bold text-yellow-600">{stats.erro}</div>
-              </div>
-              <div className="bg-blue-50 p-4 rounded-lg">
-                <div className="text-sm text-gray-500">Pendente</div>
-                <div className="text-xl font-bold text-blue-600">{stats.pendente}</div>
-              </div>
-              <div className="bg-purple-50 p-4 rounded-lg">
-                <div className="text-sm text-gray-500">Em Processo</div>
-                <div className="text-xl font-bold text-purple-600">{stats.processamento}</div>
-              </div>
-            </div>
-          )}
-
-          {batchInvalidRecords.length > 0 && (
-            <div className="mt-4">
-              <div className="p-3 bg-red-50 text-red-700 rounded-md">
-                <h3 className="text-sm font-medium">Registros Inválidos:</h3>
-                <ul className="list-disc pl-5 text-xs space-y-1">
-                  {batchInvalidRecords.map((record, index) => (
-                    <li key={index}>
-                      CPF: {record.cpf}, Nome: {record.nome}, Erro: {record.erro}
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          )}
+          <button
+            onClick={sendDataToApi}
+            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+          >
+            Confirmar Importação e Iniciar
+          </button>
         </div>
       )}
 
-      {/* Search input */}
-      <div className="mb-4">
-        <div className="relative">
-          <input
-            type="text"
-            placeholder="Pesquisar por nome do arquivo ou Batch ID..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full py-2 px-4 pr-10 rounded-md border border-gray-300 focus:ring-blue-500 focus:border-blue-500 text-sm"
-          />
-          <Search className="absolute right-3 top-2.5 h-4 w-4 text-gray-400" />
-        </div>
-      </div>
+      {(batchId || campaignResults.length > 0) && (
+        <CampaignControlSection
+          batchId={batchId}
+          batchStatus={batchStatus}
+          campaignStatus={campaignStatus}
+          startCampaign={startCampaign}
+          pauseCampaign={pauseCampaign}
+          resumeCampaign={resumeCampaign}
+          stopCampaign={stopCampaign}
+          downloadResults={downloadResults}
+          processedCount={processedCount}
+          totalRecords={totalRecords}
+          processingProgress={processingProgress}
+          stats={stats}
+          batchInvalidRecords={batchInvalidRecords}
+        />
+      )}
 
-      {/* API Data Table */}
-      <div className="bg-white rounded-lg shadow p-6">
-        <h3 className="text-lg font-medium text-gray-700 mb-4">Histórico de Lotes</h3>
-        {apiDataLoading ? (
-          <div className="flex justify-center items-center py-12">
-            <RefreshCw className="h-8 w-8 text-blue-500 animate-spin" />
-            <span className="ml-2 text-gray-600">Carregando dados...</span>
-          </div>
-        ) : apiDataError ? (
-          <div className="bg-red-50 p-4 rounded-lg text-red-700 flex items-center">
-            <AlertCircle className="h-5 w-5 mr-2" />
-            <span>{apiDataError}</span>
-          </div>
-        ) : (
-          <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
-                <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Batch ID
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Nome doArquivo
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Data de Criação
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Total de Registros
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Registros Processados
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Status
-                  </th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                    Ações
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {filteredApiData.map((item) => (
-                  <tr key={item.id}>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.batch_id}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.file_name}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {new Date(item.created_at).toLocaleString()}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.total_records}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                      {item.processed_records}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      {item.status === 'processing' && (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-yellow-100 text-yellow-800">
-                          Processando
-                        </span>
-                      )}
-                      {item.status === 'completed' && (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-green-100 text-green-800">
-                          Concluído
-                        </span>
-                      )}
-                      {item.status === 'error' && (
-                        <span className="px-2 inline-flex text-xs leading-5 font-semibold rounded-full bg-red-100 text-red-800">
-                          Erro
-                        </span>
-                      )}
-                      {/* Add more status mappings as needed */}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <div className="flex justify-end space-x-2">
-                        <button
-                          onClick={() => handleStartConsultation(item.batch_id)}
-                          className="px-3 py-1 rounded text-xs flex items-center bg-blue-600 text-white hover:bg-blue-700"
-                        >
-                          <Play className="h-3 w-3 mr-1" /> Iniciar Consulta
-                        </button>
-                        <button
-                          onClick={() => handleDeleteBatch(item.batch_id)}
-                          className="px-3 py-1 rounded text-xs flex items-center bg-red-600 text-white hover:bg-red-700"
-                        >
-                          <Trash2 className="h-3 w-3 mr-1" /> Excluir
-                        </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </div>
+      <FilterSection
+        filtros={filtros}
+        mostrarFiltros={mostrarFiltros}
+        setMostrarFiltros={setMostrarFiltros}
+        handleFilterChange={handleFilterChange}
+        limparFiltros={limparFiltros}
+        bancosDisponiveis={bancosDisponiveis}
+      />
 
-      {/* Modal para detalhes da API */}
+      <StatisticsSection
+        estatisticas={{
+          total: campaignResults.length,
+          pendentes: campaignResults.filter(r => r.status === 'pendente').length,
+          enviados: campaignResults.filter(r => r.status === 'enviado').length,
+          erros: campaignResults.filter(r => r.status === 'erro').length,
+          cancelados: campaignResults.filter(r => r.status === 'cancelado').length
+        }}
+      />
+
+      <BatchHistoryTable
+        apiDataLoading={apiDataLoading}
+        apiDataError={apiDataError}
+        filteredApiData={filteredApiData}
+        handleStartConsultation={handleStartConsultation}
+        searchQuery={searchQuery}
+        setSearchQuery={setSearchQuery}
+      />
+
       {selectedLog && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
           <div className="bg-white rounded-lg p-6 max-w-3xl w-full max-h-[80vh] overflow-y-auto">
