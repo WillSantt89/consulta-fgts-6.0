@@ -32,7 +32,9 @@ export default function PropostaForm() {
     id_da_tabela: "",
     endereco_cep: "",
     banco_tipo_conta: "",
-    contato_celular: ""
+    contato_celular: "",
+    chave_pix: "",
+    tipo_chave: ""
   });
 
   const [submitting, setSubmitting] = useState(false);
@@ -58,6 +60,13 @@ export default function PropostaForm() {
   const tiposConta = [
     { id: "c", nome: "Conta Corrente" },
     { id: "p", nome: "Conta Poupança" }
+  ];
+
+  const tiposChavePix = [
+    { id: "TELEFONE", nome: "Telefone" },
+    { id: "EMAIL", nome: "Email" },
+    { id: "CHAVE_ALEATORIA", nome: "Chave Aleatória" },
+    { id: "CPF", nome: "CPF" }
   ];
 
   const handleChange = (e) => {
@@ -117,7 +126,9 @@ export default function PropostaForm() {
         id_da_tabela: "",
         endereco_cep: "",
         banco_tipo_conta: "",
-        contato_celular: ""
+        contato_celular: "",
+        chave_pix: "",
+        tipo_chave: ""
       });
 
     } catch (err) {
@@ -557,6 +568,42 @@ export default function PropostaForm() {
                 value={formData.banco_digito_conta}
                 onChange={handleChange}
                 className="w-full px-4 py-2 border rounded-md focus:ring focus:ring-blue-300 focus:border-blue-500 outline-none transition"
+                required
+              />
+            </div>
+          </div>
+        </div>
+        
+        {/* Chave PIX */}
+        <div className="bg-gray-50 p-6 rounded-lg">
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">Chave PIX</h2>
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div>
+              <label htmlFor="tipo_chave" className="block text-sm font-medium text-gray-700 mb-1">Tipo da Chave</label>
+              <select
+                id="tipo_chave"
+                name="tipo_chave"
+                value={formData.tipo_chave}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border rounded-md focus:ring focus:ring-blue-300 focus:border-blue-500 outline-none transition"
+                required
+              >
+                <option value="">Selecione</option>
+                {tiposChavePix.map(tipo => (
+                  <option key={tipo.id} value={tipo.id}>{tipo.nome}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label htmlFor="chave_pix" className="block text-sm font-medium text-gray-700 mb-1">Chave PIX</label>
+              <input
+                type="text"
+                id="chave_pix"
+                name="chave_pix"
+                value={formData.chave_pix}
+                onChange={handleChange}
+                className="w-full px-4 py-2 border rounded-md focus:ring focus:ring-blue-300 focus:border-blue-500 outline-none transition"
+                placeholder="Chave PIX"
                 required
               />
             </div>
