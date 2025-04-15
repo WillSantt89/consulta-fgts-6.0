@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Check, Loader2 } from 'lucide-react';
+import React, { useState, useEffect } from 'react';
+import { Check, Loader2, Search } from 'lucide-react';
 
 export default function PropostaForm() {
   const [formData, setFormData] = useState({
@@ -40,6 +40,9 @@ export default function PropostaForm() {
   const [submitting, setSubmitting] = useState(false);
   const [success, setSuccess] = useState(false);
   const [error, setError] = useState('');
+  const [cpfConsulta, setCpfConsulta] = useState('');
+  const [consultaCliente, setConsultaCliente] = useState(null);
+  const [consultandoCliente, setConsultandoCliente] = useState(false);
 
   const bancos = [
     { id: "facta", nome: "Facta" },
@@ -72,6 +75,62 @@ export default function PropostaForm() {
   const handleChange = (e) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleConsultarCliente = async (e) => {
+    e.preventDefault();
+    setConsultandoCliente(true);
+    setConsultaCliente(null);
+    setError('');
+
+    try {
+      const response = await fetch('https://n8n-queue-2-n8n-webhook.igxlaz.easypanel.host/webhook/proposta', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ cpf: cpfConsulta.replace(/\D/g, ''), Tipo: 'consulta' }),
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Erro ao consultar cliente.');
+      }
+
+      const data = await response.json();
+      if (data && data.length > 0 && data[0].cadastro) {
+        const clienteData = data[0].cadastro;
+        setConsultaCliente(clienteData);
+
+        // Preencher os campos do formulário com os dados do cliente
+        setFormData(prev => ({
+          ...prev,
+          cpf: clienteData.CPF || '',
+          data_nascimento: clienteData.DATANASCIMENTO ? clienteData.DATANASCIMENTO.split('-').reverse().join('-') : '',
+          sexo: clienteData.SEXO === 'MASCULINO' ? 'M' : 'F',
+          cidade_natural: clienteData.CIDADENATURAL || '',
+          estado_natural: clienteData.ESTADONATURAL || '',
+          documento_numero: clienteData.RG || '',
+          documento_estado: clienteData.ESTADORG || '',
+          endereco_cep: clienteData.CEP || '',
+          endereco_ruaav: clienteData.ENDERECO || '',
+          endereco_numero_residencia: clienteData.NUMERO || '',
+          endereco_complemento: clienteData.COMPLEMENTO || '',
+          endereco_bairro: clienteData.BAIRRO || '',
+          endereco_cidade: clienteData.CIDADE || '',
+          endereco_estado: clienteData.ESTADO || '',
+          nome_mae: clienteData.NOMEMAE || '',
+          nome_pai: clienteData.NOMEPAI === 'NÃO CONSTA' ? '' : clienteData.NOMEPAI || '',
+        }));
+      } else {
+        setError('Cliente não encontrado ou dados incompletos.');
+      }
+
+    } catch (err: any) {
+      setError(err.message || 'Ocorreu um erro ao consultar o cliente.');
+    } finally {
+      setConsultandoCliente(false);
+    }
   };
 
   const handleSubmit = async (e) => {
@@ -167,6 +226,57 @@ export default function PropostaForm() {
               </div>
             ))}
           </div>
+        </div>
+
+        {/* Consultar Cliente */}
+        <div className="bg-gray-50 p-6 rounded-lg">
+          <h2 className="text-xl font-semibold mb-4 text-gray-700">Consultar se já é cliente</h2>
+          <div className="flex items-end gap-4">
+            <div className="flex-1">
+              <label htmlFor="cpfConsulta" className="block text-sm font-medium text-gray-700 mb-1">CPF</label>
+              <input
+                type="text"
+                id="cpfConsulta"
+                name="cpfConsulta"
+                value={cpfConsulta}
+                onChange={(e) => setCpfConsulta(e.target.value)}
+                className="w-full px-4 py-2 border rounded-md focus:ring focus:ring-blue-300 focus:border-blue-500 outline-none transition"
+                placeholder="000.000.000-00"
+              />
+            </div>
+            <button
+              type="button"
+              onClick={handleConsultarCliente}
+              disabled={consultandoCliente}
+              className={`px-4 py-2 flex items-center justify-center rounded-md ${
+                consultandoCliente
+                  ? 'bg-gray-300 cursor-not-allowed text-gray-500'
+                  : 'bg-blue-600 text-white hover:bg-blue-700'
+              }`}
+            >
+              {consultandoCliente ? (
+                <>
+                  <Loader2 className="animate-spin mr-2 h-4 w-4" />
+                  Consultando...
+                </>
+              ) : (
+                <>
+                  <Search className="h-4 w-4 mr-2" />
+                  Consultar
+                </>
+              )}
+            </button>
+          </div>
+          {consultaCliente && (
+            <div className="mt-4 p-3 bg-green-100 text-green-700 rounded-md">
+              Cliente encontrado: {consultaCliente.DESCRICAO}
+            </div>
+          )}
+          {error && (
+            <div className="mt-4 p-3 bg-red-100 text-red-700 rounded-md">
+              {error}
+            </div>
+          )}
         </div>
 
         {/* Dados Pessoais */}
@@ -643,7 +753,8 @@ export default function PropostaForm() {
           </div>
         </div>
         {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded relative" role="alert">
+          <div className="bg-red-100 border border-red-400 text-red-700```html
+px-4 py-3 rounded relative" role="alert">
             <span className="block sm:inline">{error}</span>
           </div>
         )}
