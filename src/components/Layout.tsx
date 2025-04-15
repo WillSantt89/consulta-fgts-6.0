@@ -163,7 +163,7 @@ const Layout: React.FC = () => {
                   <li>
                     <button
                       onClick={() => setFactaMenuOpen(!factaMenuOpen)}
-                      className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-700 rounded text-left"
+                      className="w-full flex items-center justify-between px-4 py-2 hover:bg-gray-700 rounded"
                     >
                       <div className="flex items-center">
                         <Building className="w-4 h-4 mr-2" />
